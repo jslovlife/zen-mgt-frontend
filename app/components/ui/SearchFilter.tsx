@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { ColumnConfig } from './DataTable';
 import { CustomDropdown } from './CustomDropdown';
+import { SearchableDropdown } from './SearchableDropdown';
 
 interface SearchFilterProps<T = any> {
   data: ColumnConfig<T>[];
@@ -123,7 +124,7 @@ export function SearchFilter<T extends Record<string, any>>({
               zIndex: 50
             }}
           >
-            <CustomDropdown
+            <SearchableDropdown
               options={[
                 { label: `All ${column.title}`, value: '' },
                 ...(column.filterOptions?.map(opt => ({ label: opt.label, value: opt.value })) || [])

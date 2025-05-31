@@ -1,10 +1,11 @@
 import React from 'react';
 import { CustomDropdown } from './CustomDropdown';
+import { SearchableDropdown } from './SearchableDropdown';
 
 export interface FormFieldProps {
   label: string;
   name: string;
-  type?: 'text' | 'email' | 'url' | 'password' | 'number' | 'textarea' | 'select' | 'datetime-local' | 'date' | 'time';
+  type?: 'text' | 'email' | 'url' | 'password' | 'number' | 'textarea' | 'select' | 'searchable-select' | 'datetime-local' | 'date' | 'time';
   value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -14,6 +15,8 @@ export interface FormFieldProps {
   options?: Array<{ value: string; label: string }>;
   rows?: number;
   className?: string;
+  searchPlaceholder?: string;
+  allowClear?: boolean;
 }
 
 export const FormField: React.FC<FormFieldProps> = ({
@@ -28,7 +31,9 @@ export const FormField: React.FC<FormFieldProps> = ({
   error,
   options,
   rows = 4,
-  className = ''
+  className = '',
+  searchPlaceholder,
+  allowClear
 }) => {
   const baseInputClass = `
     w-full px-3 py-2 border rounded-lg 
@@ -76,11 +81,23 @@ export const FormField: React.FC<FormFieldProps> = ({
 
       case 'select':
         return (
-          <CustomDropdown
+          <SearchableDropdown
             options={options || []}
             value={value.toString()}
             onChange={onChange}
             placeholder={placeholder || `Select ${label.toLowerCase()}...`}
+            className="w-full"
+          />
+        );
+
+      case 'searchable-select':
+        return (
+          <SearchableDropdown
+            options={options || []}
+            value={value.toString()}
+            onChange={onChange}
+            placeholder={searchPlaceholder || `Search ${label.toLowerCase()}...`}
+            allowClear={allowClear}
             className="w-full"
           />
         );

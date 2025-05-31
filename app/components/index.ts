@@ -29,5 +29,6 @@ export type { MfaVerificationFormData } from './forms/MfaVerificationForm';
 export type { MfaSetupFormData } from './forms/MfaSetupForm';
 export { Form, FormField, createFieldConfig } from './ui/Form';
 export { ButtonGroup } from './ui/ButtonGroup';
+export { SearchableDropdown } from './ui/SearchableDropdown';
 export type { FormProps, FormFieldProps } from './ui/Form';
 export type { ButtonGroupProps, ButtonConfig } from './ui/ButtonGroup'; 
