@@ -1,0 +1,85 @@
+/* ==========================================================================
+   CLIENT B THEME - Corporate/Enterprise theme
+   ========================================================================== */
+
+:root {
+  /* ==========================================================================
+     CLIENT B BRAND COLORS - Professional dark blue theme
+     ========================================================================== */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;  /* Client B main brand color - Sky Blue */
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+
+  /* ==========================================================================
+     CLIENT B SECONDARY COLORS - Professional gray theme
+     ========================================================================== */
+  --color-secondary-50: #f8fafc;
+  --color-secondary-100: #f1f5f9;
+  --color-secondary-200: #e2e8f0;
+  --color-secondary-300: #cbd5e1;
+  --color-secondary-400: #94a3b8;
+  --color-secondary-500: #64748b;  /* Slate gray */
+  --color-secondary-600: #475569;
+  --color-secondary-700: #334155;
+  --color-secondary-800: #1e293b;
+  --color-secondary-900: #0f172a;
+  --color-secondary-950: #020617;
+
+  /* ==========================================================================
+     CLIENT B CUSTOM GRADIENTS - Subtle professional gradients
+     ========================================================================== */
+  --color-background-gradient-start: #f8fafc;
+  --color-background-gradient-end: #f0f9ff;
+
+  /* ==========================================================================
+     CLIENT B TYPOGRAPHY - Professional font
+     ========================================================================== */
+  --font-family-sans: 'Source Sans Pro', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* ==========================================================================
+     CLIENT B COMPONENT OVERRIDES - More conservative styling
+     ========================================================================== */
+  --card-border-radius: var(--radius-lg);   /* Less rounded cards */
+  --button-height-md: 2.75rem;              /* Standard button height */
+  --card-shadow: var(--shadow-md);          /* Subtle shadows */
+}
+
+/* ==========================================================================
+   CLIENT B SPECIFIC STYLES
+   ========================================================================== */
+
+/* Professional gradient for Client B */
+.bg-gradient-client-b {
+  background: linear-gradient(135deg, #f8fafc, #f0f9ff);
+}
+
+/* Client B professional button style */
+.btn-client-b {
+  background-color: var(--color-primary-600);
+  border: 1px solid var(--color-primary-700);
+  color: white;
+  font-weight: var(--font-weight-medium);
+  transition: var(--transition-colors);
+}
+
+.btn-client-b:hover {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-800);
+}
+
+/* Client B card style */
+.card-client-b {
+  background: var(--color-background-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--card-padding);
+} 

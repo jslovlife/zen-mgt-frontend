@@ -1,0 +1,443 @@
+/* ==========================================================================
+   DATA TABLE COMPONENT STYLES - Using Design Tokens
+   ========================================================================== */
+
+.data-table-component {
+  background-color: var(--color-background-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   SEARCH SECTION STYLES
+   ========================================================================== */
+
+.search-section {
+  background-color: var(--color-background-secondary);
+  border: var(--border-width-default) solid var(--color-border-primary);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--spacing-6);
+  margin-bottom: 0;
+}
+
+.search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+}
+
+.search-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.search-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.search-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.search-input,
+.search-select {
+  padding: var(--spacing-3);
+  border: var(--border-width-default) solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  transition: var(--transition-colors);
+}
+
+.search-input:focus,
+.search-select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   DATA TABLE CONTAINER STYLES
+   ========================================================================== */
+
+.data-table-container {
+  background-color: var(--color-background-secondary);
+  border: 1px solid #e5e7eb; /* Light grey border */
+  border-radius: var(--radius-lg);
+  overflow: visible;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* Subtle shadow for depth */
+}
+
+.data-table-component .search-section + .data-table-container {
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.data-table-component .data-table-container:first-child {
+  border-radius: var(--radius-lg);
+}
+
+.data-table-wrapper {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: var(--color-background-primary);
+  overflow: visible;
+}
+
+/* ==========================================================================
+   TABLE HEADER STYLES
+   ========================================================================== */
+
+.data-table-header {
+  background-color: var(--color-primary-600); /* Purple header background */
+  overflow: visible;
+}
+
+.data-table-th {
+  padding: var(--spacing-4) var(--spacing-6);
+  text-align: left;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-primary-700);
+  white-space: nowrap;
+}
+
+.data-table-th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Remove hover styles for header */
+.data-table-th.sortable:hover {
+  background-color: transparent;
+}
+
+.sort-icon {
+  width: 12px;
+  height: 12px;
+  color: rgba(255, 255, 255, 0.6); /* Light white for inactive sort icons */
+  transition: var(--transition-colors);
+}
+
+.sort-icon.active {
+  color: #ffffff; /* Full white for active sort icon */
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+}
+
+.sort-indicators {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.selection-header {
+  width: 40px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   FILTER ROW STYLES
+   ========================================================================== */
+
+.filter-row {
+  background-color: var(--color-background-tertiary);
+  overflow: visible;
+}
+
+.filter-cell {
+  padding: var(--spacing-2) var(--spacing-6);
+  border-bottom: var(--border-width-default) solid var(--color-border-primary);
+  position: relative;
+  overflow: visible;
+}
+
+.filter-input,
+.filter-select {
+  width: 100%;
+  padding: var(--spacing-2);
+  border: var(--border-width-default) solid var(--color-border-primary);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-xs);
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  transition: var(--transition-colors);
+}
+
+.filter-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px var(--color-primary-100);
+}
+
+.filter-input::placeholder {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+/* ==========================================================================
+   TABLE BODY STYLES
+   ========================================================================== */
+
+.data-table-body {
+  background-color: #ffffff; /* White background */
+}
+
+.data-table-row {
+  border-bottom: 1px solid #e5e7eb;
+  transition: var(--transition-colors);
+}
+
+/* Alternating row colors */
+.data-table-row:nth-child(even) {
+  background-color: #f3f4f6; /* Light grey for alternating rows */
+}
+
+.data-table-row:hover {
+  background-color: #e5e7eb; /* Slightly darker grey on hover */
+}
+
+.data-table-row.selected {
+  background-color: var(--color-primary-50);
+}
+
+.data-table-row.selected:hover {
+  background-color: var(--color-primary-100);
+}
+
+.data-table-td {
+  padding: var(--spacing-4) var(--spacing-6);
+  font-size: var(--font-size-sm);
+  color: #1f2937; /* Dark grey text for better readability */
+  vertical-align: middle;
+  border-bottom: inherit;
+}
+
+.selection-cell {
+  width: 40px;
+  text-align: center;
+}
+
+.table-checkbox {
+  width: var(--spacing-4);
+  height: var(--spacing-4);
+  border: var(--border-width-default) solid var(--color-border-primary);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  accent-color: var(--color-primary-600);
+}
+
+/* ==========================================================================
+   LOADING AND EMPTY STATES
+   ========================================================================== */
+
+.loading-cell,
+.empty-cell {
+  text-align: center;
+  padding: var(--spacing-12) var(--spacing-6);
+}
+
+.loading-content,
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-4);
+  color: var(--color-text-secondary);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border-primary);
+  border-top: 3px solid var(--color-primary-600);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-text-tertiary);
+}
+
+/* ==========================================================================
+   PAGINATION STYLES
+   ========================================================================== */
+
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+}
+
+.pagination-info {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.selection-info {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-600);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  flex-wrap: wrap;
+}
+
+.pagination-ellipsis {
+  padding: var(--spacing-2) var(--spacing-1);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.page-size-selector {
+  margin-left: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  border: var(--border-width-default) solid var(--color-border-primary);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.page-size-selector:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px var(--color-primary-100);
+}
+
+/* ==========================================================================
+   RESPONSIVE STYLES
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .search-fields {
+    grid-template-columns: 1fr;
+  }
+  
+  .search-actions {
+    justify-content: stretch;
+  }
+  
+  .search-actions > * {
+    flex: 1;
+  }
+  
+  .pagination-container {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .pagination-controls {
+    justify-content: center;
+  }
+  
+  .data-table-wrapper {
+    overflow-x: scroll;
+  }
+  
+  .data-table {
+    min-width: 600px;
+  }
+  
+  .data-table-th,
+  .data-table-td {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+  
+  .filter-cell {
+    padding: var(--spacing-2) var(--spacing-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .search-section {
+    padding: var(--spacing-4);
+  }
+  
+  .data-table-th,
+  .data-table-td {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-size-xs);
+  }
+  
+  .pagination-container {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.data-table-component .w-4 {
+  width: 1rem;
+}
+
+.data-table-component .h-4 {
+  height: 1rem;
+}
+
+.data-table-component .mr-2 {
+  margin-right: 0.5rem;
+} 

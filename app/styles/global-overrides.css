@@ -1,0 +1,86 @@
+/* ==========================================================================
+   GLOBAL BROWSER OVERRIDES - Maximum specificity to override browser defaults
+   ========================================================================== */
+
+/* Force remove ALL browser blue colors from selects globally */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Override ALL select elements in the app */
+select,
+select:hover,
+select:focus,
+select:active,
+select:focus-visible,
+select:focus-within {
+  outline-color: var(--color-primary-600) !important;
+  accent-color: var(--color-primary-600) !important;
+}
+
+/* Force option styling with maximum specificity */
+option,
+select option,
+select > option,
+optgroup,
+select optgroup {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Target all possible hover states */
+option:hover,
+option:focus,
+option:active,
+option:checked,
+option[selected],
+select option:hover,
+select option:focus,
+select option:active,
+select option:checked,
+select option[selected] {
+  background-color: var(--color-primary-100) !important;
+  color: var(--color-primary-800) !important;
+  background-image: none !important;
+}
+
+/* Chrome/Edge specific overrides */
+@supports (-webkit-appearance: none) {
+  option:checked {
+    background: var(--color-primary-100) -webkit-linear-gradient(0deg, transparent 0%, transparent 100%) !important;
+    color: var(--color-primary-800) !important;
+  }
+}
+
+/* Firefox specific overrides */
+@supports (-moz-appearance: none) {
+  option:checked,
+  option:hover {
+    background-color: var(--color-primary-100) !important;
+    color: var(--color-primary-800) !important;
+  }
+}
+
+/* Remove blue highlight from all form controls */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline-color: var(--color-primary-600) !important;
+}
+
+/* Ensure no parent containers break dropdown positioning */
+.bg-gray-50,
+.rounded-lg,
+.border,
+.overflow-hidden,
+.overflow-x-auto,
+.overflow-y-auto {
+  position: static !important;
+}
+
+/* Force dropdown menu to appear in correct position */
+select {
+  position: relative !important;
+  z-index: 9999 !important;
+} 

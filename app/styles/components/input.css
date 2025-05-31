@@ -1,0 +1,281 @@
+/* ==========================================================================
+   INPUT COMPONENT STYLES - Using Design Tokens
+   ========================================================================== */
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.input-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+}
+
+.input-required {
+  color: var(--color-error-500);
+  margin-left: var(--spacing-1);
+}
+
+.input-field {
+  width: 100%;
+  border-radius: var(--radius-lg);
+  transition: var(--transition-colors);
+  font-family: var(--font-family-sans);
+  color: var(--color-text-primary);
+  background-color: var(--color-background-primary);
+  border: var(--input-border-width) solid var(--color-border-primary);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-background-tertiary);
+}
+
+.input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Size Variants */
+.input-sm {
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-sm);
+  height: var(--input-height-sm);
+}
+
+.input-md {
+  padding: var(--spacing-3) var(--spacing-4);
+  font-size: var(--font-size-base);
+  height: var(--input-height-md);
+}
+
+.input-lg {
+  padding: var(--spacing-4) var(--spacing-5);
+  font-size: var(--font-size-lg);
+  height: var(--input-height-lg);
+}
+
+/* Style Variants */
+.input-default {
+  border: var(--input-border-width) solid var(--color-border-primary);
+  background-color: var(--color-background-primary);
+}
+
+.input-filled {
+  border: none;
+  background-color: var(--color-background-tertiary);
+}
+
+.input-outlined {
+  border: 2px solid var(--color-border-primary);
+  background-color: transparent;
+}
+
+/* Error State */
+.input-error {
+  border-color: var(--color-border-error) !important;
+  background-color: var(--color-error-50);
+}
+
+.input-error:focus {
+  border-color: var(--color-border-error) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.input-error-message {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-error-600);
+  margin-top: var(--spacing-1);
+}
+
+.input-error-icon {
+  height: var(--spacing-4);
+  width: var(--spacing-4);
+  margin-right: var(--spacing-1);
+  flex-shrink: 0;
+}
+
+.input-helper-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-1);
+}
+
+/* Focus states for variants */
+.input-filled:focus {
+  background-color: var(--color-background-secondary);
+}
+
+.input-outlined:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .input-field {
+    background-color: var(--color-background-secondary);
+  }
+  
+  .input-filled {
+    background-color: var(--color-background-tertiary);
+  }
+  
+  .input-filled:focus {
+    background-color: var(--color-background-primary);
+  }
+}
+
+/* ==========================================================================
+   SEARCH INPUT COMPONENT - Theme-aware input styling
+   ========================================================================== */
+.search-input {
+  border: 1px solid var(--color-border-primary) !important;
+  background-color: var(--color-background-primary) !important;
+  transition: all 0.2s ease-in-out !important;
+  padding-left: 5rem !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.search-input:hover {
+  border-color: var(--color-primary-600) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--color-primary-600) !important;
+}
+
+.search-input:focus {
+  outline: none !important;
+  border-color: var(--color-primary-600) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 3px rgba(147, 51, 234, 0.3) !important;
+}
+
+/* ==========================================================================
+   DROPDOWN SELECT STYLES - Complete override for proper positioning
+   ========================================================================== */
+
+/* Reset ALL select styles to prevent interference */
+.search-input[type="select"],
+.search-input select,
+select.search-input {
+  /* Reset positioning that might affect dropdown */
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  position: relative !important;
+  z-index: 1 !important;
+  transform: none !important;
+  contain: none !important;
+  isolation: auto !important;
+  cursor: pointer !important;
+  
+  /* Force proper dropdown positioning */
+  -webkit-transform: translateZ(0) !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
+}
+
+/* Force theme colors with vendor prefixes for maximum compatibility */
+select.search-input,
+.search-input select,
+html select.search-input,
+body select.search-input {
+  /* Remove ALL browser styling */
+  background-image: none !important;
+  filter: none !important;
+  
+  /* Force theme colors */
+  accent-color: var(--color-primary-600) !important;
+  color-scheme: light !important;
+  
+  /* Webkit specific */
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Style the dropdown arrow with theme color */
+select.search-input::-ms-expand {
+  display: none !important;
+}
+
+/* Force option styles with ALL vendor prefixes */
+select.search-input option,
+.search-input select option,
+select.search-input optgroup,
+.search-input select optgroup {
+  background-color: white !important;
+  color: var(--color-text-primary) !important;
+  padding: 8px !important;
+  font-size: 14px !important;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  select.search-input option:hover,
+  .search-input select option:hover,
+  select.search-input option:focus,
+  .search-input select option:focus,
+  select.search-input option:checked,
+  .search-input select option:checked {
+    background: -webkit-linear-gradient(var(--color-primary-100), var(--color-primary-100)) !important;
+    background-color: var(--color-primary-100) !important;
+    color: var(--color-primary-800) !important;
+  }
+}
+
+/* Firefox specific */
+@-moz-document url-prefix() {
+  select.search-input option:hover,
+  .search-input select option:hover,
+  select.search-input option:focus,
+  .search-input select option:focus,
+  select.search-input option:checked,
+  .search-input select option:checked {
+    background-color: var(--color-primary-100) !important;
+    color: var(--color-primary-800) !important;
+  }
+}
+
+/* Remove any blue highlight from Chrome/Edge */
+select.search-input:focus-visible {
+  outline: 2px solid var(--color-primary-600) !important;
+  outline-offset: 2px !important;
+}
+
+/* Force remove blue highlight on options */
+select.search-input option::-moz-selection,
+.search-input select option::-moz-selection {
+  background-color: var(--color-primary-100) !important;
+  color: var(--color-primary-800) !important;
+}
+
+select.search-input option::selection,
+.search-input select option::selection {
+  background-color: var(--color-primary-100) !important;
+  color: var(--color-primary-800) !important;
+}
+
+/* Ensure parent containers don't interfere with dropdown */
+.bg-gray-50,
+.rounded-lg,
+.border {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Additional specificity for stubborn browsers */
+html body select.search-input option:hover,
+html body .search-input select option:hover {
+  background-color: var(--color-primary-100) !important;
+  color: var(--color-primary-800) !important;
+} 
