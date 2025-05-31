@@ -20,7 +20,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
   return (
     <div className={`p-2 sm:p-4 w-full min-h-screen ${className}`}>
       {/* Card Container */}
-      <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 w-full">
+      <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 w-full relative">
         {/* Title and Add Button Section */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center gap-3">

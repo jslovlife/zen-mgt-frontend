@@ -2,6 +2,100 @@ import React, { useState, useCallback } from 'react';
 import { Button } from './Button';
 import { Search } from 'lucide-react';
 
+// Action Button Component for table actions
+export type ActionButtonVariant = 'info' | 'error' | 'success' | 'warning' | 'primary';
+
+export interface ActionButtonProps {
+  variant: ActionButtonVariant;
+  onClick: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
+  className?: string;
+}
+
+export const ActionButton: React.FC<ActionButtonProps> = ({
+  variant,
+  onClick,
+  children,
+  disabled = false,
+  size = 'sm',
+  className = ''
+}) => {
+  const getVariantColors = (variant: ActionButtonVariant) => {
+    const colorMap = {
+      info: {
+        base: 'var(--color-info-500)',
+        hover: 'var(--color-info-600)',
+        focus: 'var(--color-info-300)'
+      },
+      error: {
+        base: 'var(--color-error-500)',
+        hover: 'var(--color-error-600)',
+        focus: 'var(--color-error-300)'
+      },
+      success: {
+        base: 'var(--color-success-500)',
+        hover: 'var(--color-success-600)',
+        focus: 'var(--color-success-300)'
+      },
+      warning: {
+        base: 'var(--color-warning-500)',
+        hover: 'var(--color-warning-600)',
+        focus: 'var(--color-warning-300)'
+      },
+      primary: {
+        base: 'var(--color-primary-600)',
+        hover: 'var(--color-primary-700)',
+        focus: 'var(--color-primary-400)'
+      }
+    };
+    return colorMap[variant];
+  };
+
+  const sizeClasses = size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-base';
+  const colors = getVariantColors(variant);
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center ${sizeClasses} font-medium transition-colors rounded-md ${className}`}
+      style={{
+        color: '#ffffff',
+        backgroundColor: colors.base,
+        borderColor: colors.base,
+        border: '1px solid',
+        opacity: disabled ? 0.6 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer'
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.backgroundColor = colors.hover;
+          e.currentTarget.style.borderColor = colors.hover;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.backgroundColor = colors.base;
+          e.currentTarget.style.borderColor = colors.base;
+        }
+      }}
+      onFocus={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.outline = 'none';
+          e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.focus}`;
+        }
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
 // Data types for column configuration
 export type DataType = 'string' | 'number' | 'timestamp' | 'boolean';
 
@@ -190,14 +284,18 @@ export function DataTable<T extends Record<string, any>>({
                     }}>
                       {column.filterable && (
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
                           <input
                             type="text"
                             value={filterValues[column.key as string] || ''}
                             onChange={(e) => handleFilter(column.key as string, e.target.value)}
                             placeholder={`Filter ${column.title.toLowerCase()}...`}
-                            className="search-input w-full pl-12 pr-4 py-2 rounded-lg"
-                            style={{ height: '42px' }}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                            style={{ 
+                              height: '42px',
+                              backgroundColor: 'var(--color-background-primary)',
+                              borderColor: 'var(--color-border-primary)',
+                              color: 'var(--color-text-primary)'
+                            }}
                           />
                         </div>
                       )}

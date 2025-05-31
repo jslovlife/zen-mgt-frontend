@@ -167,8 +167,15 @@ export const NAVIGATION_CONFIG = {
     },
     'TOOLS': {
       title: 'Tools',
-      order: 4,
+      order: 6,
       routes: {
+        'api-test': {
+          title: 'API Test',
+          description: 'Test API endpoints',
+          addButtonText: 'Create Test',
+          icon: <Code className="w-5 h-5" />,
+          path: '/dashboard/api-test'
+        },
         'reports': {
           title: 'Reports', 
           description: 'View and generate system reports',
@@ -180,7 +187,7 @@ export const NAVIGATION_CONFIG = {
     },
     'USER ADMINISTRATION': {
       title: 'User Administration',
-      order: 5,
+      order: 7,
       routes: {
         'user-management': {
           title: 'User Management',
@@ -207,7 +214,7 @@ export const NAVIGATION_CONFIG = {
     },
     'SYSTEM ADMINISTRATION': {
       title: 'System Administration',
-      order: 6,
+      order: 8,
       routes: {
         'system-parameter': {
           title: 'System Parameter',
@@ -300,7 +307,8 @@ export function getNavigationConfig(activeModule?: string): NavSection[] {
         key: routeKey,
         label: route.title,
         icon: route.icon,
-        path: route.path
+        path: route.path,
+        active: activeModule === routeKey
       }))
     }));
 }

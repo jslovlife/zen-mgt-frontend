@@ -12,36 +12,44 @@ export default function DashboardLayout() {
   const getActiveModuleFromPath = () => {
     const path = location.pathname;
     
-    // Site
-    if (path.includes('/site-management')) return 'site-management';
+    // Map paths to modules based on the routes configuration
+    // Handle both flat routes (dashboard.site-management) and nested routes (dashboard.site.site-management)
+    if (path.includes('/site/site-management') || path.includes('/site-management')) return 'site-management';
+    if (path.includes('/site/site-pay-platform') || path.includes('/site-pay-platform')) return 'site-pay-platform';
+    if (path.includes('/site/site-withdraw-platform') || path.includes('/site-withdraw-platform')) return 'site-withdraw-platform';
     
-    // Payment
-    if (path.includes('/payment-order')) return 'payment-order';
-    if (path.includes('/withdraw-order')) return 'withdraw-order';
+    if (path.includes('/platform/payment-platform') || path.includes('/payment-platform')) return 'payment-platform';
+    if (path.includes('/platform/withdraw-platform') || path.includes('/withdraw-platform')) return 'withdraw-platform';
     
-    // Platform Channel
-    if (path.includes('/payment-platform')) return 'payment-platform';
-    if (path.includes('/withdraw-platform')) return 'withdraw-platform';
+    if (path.includes('/orders/payment-order') || path.includes('/payment-order')) return 'payment-order';
+    if (path.includes('/orders/withdraw-order') || path.includes('/withdraw-order')) return 'withdraw-order';
     
-    // Config
-    if (path.includes('/payment-category')) return 'payment-category';
-    if (path.includes('/bank-list')) return 'bank-list';
-    if (path.includes('/customize-bank-list')) return 'customize-bank-list';
+    if (path.includes('/configuration/payment-type') || path.includes('/payment-type')) return 'payment-type';
+    if (path.includes('/configuration/currency-list') || path.includes('/currency-list')) return 'currency-list';
+    if (path.includes('/configuration/bank-list') || path.includes('/bank-list')) return 'bank-list';
+    if (path.includes('/configuration/platform-bank-list') || path.includes('/platform-bank-list')) return 'platform-bank-list';
     
-    // API Template
-    if (path.includes('/template-management')) return 'template-management';
+    if (path.includes('/tools/reports') || path.includes('/reports')) return 'reports';
     
-    // Tools
+    if (path.includes('/user-administration/user-management') || path.includes('/user-management')) return 'user-management';
+    if (path.includes('/user-administration/user-group-management') || path.includes('/user-group-management')) return 'user-group-management';
+    if (path.includes('/user-administration/menu-management') || path.includes('/menu-management')) return 'resource-management';
+    
+    if (path.includes('/system-administration/system-schedule-job') || path.includes('/system-schedule-job')) return 'system-schedule-job';
+    if (path.includes('/settings') || path.includes('/system-parameter')) return 'system-parameter';
+    
+    // Additional routes that exist in file listing
     if (path.includes('/api-test')) return 'api-test';
-    if (path.includes('/reports')) return 'reports';
-    
-    // System
-    if (path.includes('/user-management')) return 'user-management';
-    if (path.includes('/user-group-management')) return 'user-group-management';
-    if (path.includes('/role-management')) return 'role-management';
     if (path.includes('/audit-trail')) return 'audit-trail';
+    if (path.includes('/payment-category')) return 'payment-category';
+    if (path.includes('/customize-bank-list')) return 'customize-bank-list';
+    if (path.includes('/template-management')) return 'template-management';
+    if (path.includes('/role-management')) return 'role-management';
     
-    return 'site-management'; // default
+    // Default dashboard if on main dashboard route
+    if (path === '/dashboard' || path === '/dashboard/') return 'dashboard';
+    
+    return 'site-management'; // default fallback
   };
 
   const activeModule = getActiveModuleFromPath();
@@ -56,6 +64,47 @@ export default function DashboardLayout() {
       href: item.href,
       current: !item.href
     }));
+  };
+
+  // Determine if we should show back button (global - show on all pages except main dashboard)
+  const shouldShowBackButton = () => {
+    const path = location.pathname;
+    // Hide back button only on main dashboard page
+    return path !== '/dashboard' && path !== '/dashboard/';
+  };
+
+  // Get back navigation path (smart navigation based on current path)
+  const getBackPath = () => {
+    const path = location.pathname;
+    
+    // For sub-pages, go back to the main module page
+    if (path.includes('/insert') || path.includes('/edit') || path.includes('/view') || path.includes('/detail')) {
+      if (path.includes('/site/site-management')) {
+        return '/dashboard/site/site-management';
+      }
+      if (path.includes('/site/site-pay-platform')) {
+        return '/dashboard/site/site-pay-platform';
+      }
+      if (path.includes('/site/site-withdraw-platform')) {
+        return '/dashboard/site/site-withdraw-platform';
+      }
+      if (path.includes('/platform/payment-platform')) {
+        return '/dashboard/platform/payment-platform';
+      }
+      if (path.includes('/platform/withdraw-platform')) {
+        return '/dashboard/platform/withdraw-platform';
+      }
+      if (path.includes('/orders/payment-order')) {
+        return '/dashboard/orders/payment-order';
+      }
+      if (path.includes('/orders/withdraw-order')) {
+        return '/dashboard/orders/withdraw-order';
+      }
+      // Add more module back paths as needed
+    }
+    
+    // For main module pages, go back to dashboard
+    return '/dashboard';
   };
 
   const handleLogout = () => {
@@ -92,7 +141,11 @@ export default function DashboardLayout() {
             />
             
             {/* Breadcrumbs Component */}
-            <Breadcrumb items={getBreadcrumbs()} />
+            <Breadcrumb 
+              items={getBreadcrumbs()} 
+              showBackButton={shouldShowBackButton()}
+              backTo={getBackPath()}
+            />
           </div>
 
           <div className="top-nav-right">

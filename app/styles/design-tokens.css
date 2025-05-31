@@ -76,6 +76,19 @@
   --color-error-900: #7f1d1d;
   --color-error-950: #450a0a;
 
+  /* Danger Colors - Custom brand danger color */
+  --color-danger-50: #fef7f7;
+  --color-danger-100: #fdeaea;
+  --color-danger-200: #fcd5d5;
+  --color-danger-300: #fab5b5;
+  --color-danger-400: #fe7c96;  /* Main danger color - Custom brand color */
+  --color-danger-500: #f85a7a;
+  --color-danger-600: #e8446a;
+  --color-danger-700: #d1335a;
+  --color-danger-800: #b22a4a;
+  --color-danger-900: #95243e;
+  --color-danger-950: #52121f;
+
   /* Info Colors */
   --color-info-50: #f0f9ff;
   --color-info-100: #e0f2fe;

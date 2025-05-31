@@ -1,24 +1,15 @@
 import React, { useState } from 'react';
 import { Building2 } from 'lucide-react';
+import { useNavigate } from '@remix-run/react';
 import { getRouteConfig } from '../config/routes';
-import { DataTable, ColumnConfig } from '../components/ui/DataTable';
+import { DataTable, ColumnConfig, ActionButton } from '../components/ui/DataTable';
 import { SearchFilter } from '../components/ui/SearchFilter';
 import { DateTimeUtil } from '../utils';
 import { PageLayout } from '../components/layout/PageLayout';
-
-// Types
-interface Site {
-  id: string;
-  name: string;
-  url: string;
-  status: 'active' | 'inactive';
-  merchantId: string;
-  description: string;
-  createdAt: string;
-  lastModified: string;
-}
+import { Site } from '../types/site.type';
 
 const SiteManagement: React.FC = () => {
+  const navigate = useNavigate();
   // Get route configuration
   const routeConfig = getRouteConfig('site-management');
   
@@ -36,7 +27,9 @@ const SiteManagement: React.FC = () => {
       merchantId: 'MCH001',
       description: 'Primary e-commerce platform for online sales and customer management',
       createdAt: '2024-01-15T10:30:00Z',
-      lastModified: '2024-02-20T14:45:00Z'
+      createdBy: 'John Doe',
+      modifiedAt: '2024-02-20T14:45:00Z',
+      modifiedBy: 'Jane Doe'
     },
     {
       id: '2',
@@ -46,7 +39,9 @@ const SiteManagement: React.FC = () => {
       merchantId: 'MCH002',
       description: 'Mobile application backend API and administration portal',
       createdAt: '2024-02-01T09:15:00Z',
-      lastModified: '2024-03-10T16:20:00Z'
+      createdBy: 'John Doe',
+      modifiedAt: '2024-03-10T16:20:00Z',
+      modifiedBy: 'Jane Doe'
     },
     {
       id: '3',
@@ -56,7 +51,9 @@ const SiteManagement: React.FC = () => {
       merchantId: 'MCH003',
       description: 'Beta testing environment for new features and experimental functionality',
       createdAt: '2024-03-05T11:00:00Z',
-      lastModified: '2024-03-15T13:30:00Z'
+      createdBy: 'John Doe',
+      modifiedAt: '2024-03-15T13:30:00Z',
+      modifiedBy: 'Jane Doe'
     },
     {
       id: '4',
@@ -66,7 +63,9 @@ const SiteManagement: React.FC = () => {
       merchantId: 'MCH001',
       description: 'Business intelligence and analytics dashboard for data visualization',
       createdAt: '2024-01-20T08:45:00Z',
-      lastModified: '2024-03-05T10:15:00Z'
+      createdBy: 'John Doe',
+      modifiedAt: '2024-03-05T10:15:00Z',
+      modifiedBy: 'Jane Doe'
     },
     {
       id: '5',
@@ -76,7 +75,9 @@ const SiteManagement: React.FC = () => {
       merchantId: 'MCH004',
       description: 'Legacy system support and maintenance portal for older applications',
       createdAt: '2023-12-10T14:20:00Z',
-      lastModified: '2024-02-28T16:40:00Z'
+      createdBy: 'John Doe',
+      modifiedAt: '2024-02-28T16:40:00Z',
+      modifiedBy: 'Jane Doe'
     }
   ];
 
@@ -156,6 +157,52 @@ const SiteManagement: React.FC = () => {
           {DateTimeUtil.toCustomFormat(value, 'YYYY-MM-DD')}
         </div>
       )
+    },
+    {
+      key: 'createdBy',
+      title: 'Created By',
+      dataType: 'string',
+      sortable: true,
+      filterable: true, // Only show instant filter in DataTable
+      render: (value) => (
+        <div className="text-gray-600">{value}</div>
+      )
+    },
+    {
+      key: 'modifiedAt',
+      title: 'Last Modified',
+      dataType: 'timestamp',
+      sortable: true,
+      filterable: true, // Only show instant filter in DataTable
+      render: (value) => (
+        <div className="text-gray-600">
+          {DateTimeUtil.toCustomFormat(value, 'YYYY-MM-DD')}
+        </div>
+      )
+    },
+    {
+      key: 'actions' as keyof Site,
+      title: 'Actions',
+      dataType: 'string',
+      sortable: false,
+      filterable: false,
+      searchable: false,
+      render: (value, record) => (
+        <div className="flex items-center gap-2">
+          <ActionButton
+            variant="primary"
+            onClick={() => handleViewSite(record.id)}
+          >
+            View
+          </ActionButton>
+          <ActionButton
+            variant="error"
+            onClick={() => handleDeleteSite(record.id, record.name)}
+          >
+            Delete
+          </ActionButton>
+        </div>
+      )
     }
   ];
 
@@ -195,7 +242,32 @@ const SiteManagement: React.FC = () => {
   };
 
   // Event handlers
-  const handleAddSite = () => console.log('Add new site');
+  const handleAddSite = () => {
+    navigate('/dashboard/site/site-management/insert');
+  };
+
+  const handleViewSite = (siteId: string) => {
+    // Navigate to site detail page
+    window.location.href = `/dashboard/site/site-management/${siteId}`;
+  };
+
+  const handleDeleteSite = (siteId: string, siteName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the site "${siteName}"?\n\nThis action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      // Filter out the deleted site from the current sites state
+      const updatedSites = sites.filter(site => site.id !== siteId);
+      setSites(updatedSites);
+      
+      // In a real application, you would make an API call here
+      console.log(`Deleting site with ID: ${siteId}`);
+      
+      // Optional: Show success message
+      alert(`Site "${siteName}" has been deleted successfully.`);
+    }
+  };
 
   if (!routeConfig) {
     return <div>Route configuration not found</div>;
