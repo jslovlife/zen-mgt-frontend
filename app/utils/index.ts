@@ -44,4 +44,7 @@ export {
   addDays,
   addHours,
   addMinutes
-} from './datetime.util'; 
+} from './datetime.util';
+
+// Encryption Utilities
+export { EncryptionUtil } from './encryption.util'; 

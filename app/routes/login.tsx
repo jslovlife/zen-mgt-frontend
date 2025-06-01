@@ -1,20 +1,22 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { useActionData } from "@remix-run/react";
+import { redirect, json, type ActionFunctionArgs } from "@remix-run/node";
+import { useActionData, useNavigation } from "@remix-run/react";
+import { useEffect } from "react";
 import { z } from "zod";
-import { LoginForm, LoginFormData } from "~/components/forms/LoginForm";
-import { APIUtil, LoginRequest } from "~/utils/api.util";
+import { LoginForm } from "~/components/forms/LoginForm";
+import { APIUtil, type LoginRequest } from "~/utils/api.util";
 import { GlobalAlertMessageHandler } from "~/utils/alert.util";
+import { createAuthCookie } from "~/config/session.server";
 
 // Validation schema
 const loginSchema = z.object({
-  username: z.string().min(1, "Please enter your email or username"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  mfaCode: z.string().optional(), // Optional MFA code for scenario 3
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+  mfaCode: z.string().optional()
 });
 
 // Type for action data
 type ActionData = {
-  error: string;
+  error?: string;
   fieldErrors?: {
     username?: string[];
     password?: string[];
@@ -22,6 +24,8 @@ type ActionData = {
   };
   showMfaField?: boolean; // Flag to show MFA field automatically
 };
+
+// Note: Using createAuthCookie from ~/config/session.server
 
 // Action function to handle form submission
 export async function action({ request }: ActionFunctionArgs) {
@@ -94,7 +98,21 @@ export async function action({ request }: ActionFunctionArgs) {
       // Scenario 1: Fresh user (no MFA) - gets token immediately
       if (data.token && !data.requireMfa && !data.requireMfaSetup) {
         console.log("Scenario 1: Direct login with token");
-        return redirect("/dashboard");
+        console.log("Token received:", data.token.substring(0, 20) + "...");
+        
+        console.log("=== CREATING AUTH COOKIE ===");
+        const cookieValue = createAuthCookie(data.token);
+        console.log("Cookie value:", cookieValue);
+        
+        console.log("=== SETTING REDIRECT FLAG AND USING SERVER REDIRECT ===");
+        console.log("Using traditional redirect() to force navigation");
+        
+        // Store a flag in client-side for redirect detection
+        return redirect("/dashboard", {
+          headers: {
+            "Set-Cookie": cookieValue,
+          },
+        });
       }
 
       // Scenario 2: User needs MFA setup
@@ -119,7 +137,22 @@ export async function action({ request }: ActionFunctionArgs) {
       // Scenario 3: MFA verification successful
       if (data.token && result.data.mfaCode) {
         console.log("Scenario 3: MFA verification successful");
-        return redirect("/dashboard");
+        console.log("Token received:", data.token.substring(0, 20) + "...");
+        
+        console.log("Creating MFA redirect response with cookie");
+        
+        console.log("=== CREATING MFA AUTH COOKIE ===");
+        const cookieValue = createAuthCookie(data.token);
+        console.log("Cookie value:", cookieValue);
+        
+        console.log("=== MFA SERVER REDIRECT ===");
+        console.log("Using traditional redirect() for MFA success");
+        
+        return redirect("/dashboard", {
+          headers: {
+            "Set-Cookie": cookieValue,
+          },
+        });
       }
 
       // Fallback for unexpected response
@@ -152,10 +185,37 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Login() {
   const actionData = useActionData<ActionData>();
+  const navigation = useNavigation();
+
+  console.log("=== LOGIN COMPONENT RENDER ===");
+  console.log("actionData:", actionData);
+  console.log("navigation state:", navigation.state);
+
+  useEffect(() => {
+    console.log("=== LOGIN COMPONENT MOUNTED ===");
+    console.log("Navigation state:", navigation.state);
+    console.log("Navigation location:", navigation.location);
+    
+    return () => {
+      console.log("=== LOGIN COMPONENT UNMOUNTED ===");
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log("=== NAVIGATION STATE CHANGED ===");
+    console.log("Current navigation state:", navigation.state);
+    console.log("Current navigation location:", navigation.location);
+    
+    if (navigation.state === "loading") {
+      console.log("Login component is loading/navigating");
+    } else if (navigation.state === "idle") {
+      console.log("Login component is idle");
+    }
+  }, [navigation.state, navigation.location]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md">
         <LoginForm 
           error={actionData?.error}
           fieldErrors={actionData?.fieldErrors}
@@ -163,7 +223,7 @@ export default function Login() {
         />
 
         {/* Additional Info */}
-        <div className="text-center">
+        <div className="text-center mt-6">
           <p className="text-xs text-gray-500">
             By signing in, you agree to our{" "}
             <a href="#" className="text-indigo-600 hover:text-indigo-500">

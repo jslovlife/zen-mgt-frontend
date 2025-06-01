@@ -218,4 +218,137 @@
     padding: var(--spacing-3) var(--spacing-4);
     font-size: var(--font-size-sm);
   }
+}
+
+/* Form Button Styles - for forms/Button.tsx component */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition-all);
+  gap: var(--spacing-2);
+  font-family: var(--font-family-sans);
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.button-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Form Button Sizes */
+.button-sm {
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-xs);
+  gap: var(--spacing-1);
+}
+
+.button-md {
+  padding: var(--spacing-3) var(--spacing-4);
+  font-size: var(--font-size-sm);
+  gap: var(--spacing-2);
+}
+
+.button-lg {
+  padding: var(--spacing-4) var(--spacing-6);
+  font-size: var(--font-size-base);
+  gap: var(--spacing-3);
+}
+
+/* Form Button Variants */
+.button-primary {
+  background-color: var(--color-primary-600);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary-600);
+}
+
+.button-primary:hover:not(.button-disabled) {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+}
+
+.button-secondary {
+  background-color: transparent;
+  color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+}
+
+.button-secondary:hover:not(.button-disabled) {
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+}
+
+.button-outline {
+  background-color: transparent;
+  color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+}
+
+.button-outline:hover:not(.button-disabled) {
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+}
+
+.button-ghost {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  border-color: transparent;
+}
+
+.button-ghost:hover:not(.button-disabled) {
+  background-color: var(--color-background-secondary);
+  color: var(--color-text-primary);
+}
+
+.button-danger {
+  background-color: var(--color-danger-400);
+  color: var(--color-text-inverse);
+  border-color: var(--color-danger-400);
+}
+
+.button-danger:hover:not(.button-disabled) {
+  background-color: var(--color-danger-500);
+  border-color: var(--color-danger-500);
+}
+
+/* Form Button Spinner */
+.button-spinner {
+  width: 1em;
+  height: 1em;
+  animation: button-spin 1s linear infinite;
+  margin-right: var(--spacing-2);
+}
+
+.button-spinner-track {
+  opacity: 0.25;
+}
+
+.button-spinner-fill {
+  opacity: 0.75;
+}
+
+@keyframes button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 } 

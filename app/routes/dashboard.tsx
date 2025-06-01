@@ -1,12 +1,44 @@
-import { useState } from "react";
-import { Outlet, useLocation } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { Outlet, useLocation, useNavigate } from "@remix-run/react";
+import { type LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Button, Breadcrumb, SideNavbar } from "~/components";
 import type { BreadcrumbItem } from "~/components";
 import { getNavigationConfig, getBreadcrumbConfig } from "~/config/routes";
+import { AuthService } from "~/services/auth.service";
+import { APIUtil } from "~/utils/api.util";
+import { requireAuth } from "~/config/session.server";
+
+// Loader function to protect dashboard routes
+export async function loader({ request }: LoaderFunctionArgs) {
+  console.log("=== DASHBOARD LOADER START ===");
+  
+  // Use the centralized authentication utility
+  const session = requireAuth(request);
+  
+  console.log("Auth token found in cookies:", session.authToken?.substring(0, 20) + "...");
+  console.log("Authentication passed, allowing dashboard access");
+  
+  return null;
+}
 
 export default function DashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    console.log("=== DASHBOARD COMPONENT MOUNTED ===");
+    console.log("Dashboard location:", location.pathname);
+    
+    return () => {
+      console.log("=== DASHBOARD COMPONENT UNMOUNTED ===");
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log("=== DASHBOARD LOCATION CHANGED ===");
+    console.log("New location:", location.pathname);
+  }, [location.pathname]);
 
   // Determine active module from current path
   const getActiveModuleFromPath = () => {
@@ -107,10 +139,28 @@ export default function DashboardLayout() {
     return '/dashboard';
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('tempToken');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    console.log("=== CLIENT LOGOUT INITIATED ===");
+    
+    try {
+      // Clear client-side tokens first
+      const authService = AuthService.getInstance();
+      await authService.logout();
+      console.log("Client-side logout completed");
+      
+      // Clear the auth cookie immediately on client-side
+      document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      console.log("Client-side cookie cleared");
+      
+      // Navigate to logout route which will handle server-side cleanup
+      navigate('/logout', { replace: true });
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails, still clear cookie and navigate to logout route
+      document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      navigate('/logout', { replace: true });
+    }
   };
 
   return (

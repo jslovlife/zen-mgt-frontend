@@ -5,6 +5,23 @@ import { PageLayout } from '../components/layout/PageLayout';
 import { Form, FormField, ButtonGroup } from '../components';
 import type { ButtonConfig } from '../components';
 import { Site } from '../types/site.type';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { useActionData, useNavigation } from "@remix-run/react";
+import { APIUtil } from "~/utils/api.util";
+import { requireAuth } from "~/config/session.server";
+
+// Loader function to protect the route
+export async function loader({ request }: LoaderFunctionArgs) {
+  console.log("=== SITE INSERT LOADER START ===");
+  
+  // Use the centralized authentication utility
+  const session = requireAuth(request);
+  
+  console.log("Site insert auth token found:", session.authToken?.substring(0, 20) + "...");
+  console.log("Site insert authentication passed, allowing access");
+  
+  return null;
+}
 
 const SiteInsert: React.FC = () => {
   const navigate = useNavigate();

@@ -1,12 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { LoaderFunctionArgs, redirect, json } from "@remix-run/node";
 import { Building2 } from 'lucide-react';
-import { useNavigate } from '@remix-run/react';
+import { useNavigate, useLoaderData, Link } from '@remix-run/react';
 import { getRouteConfig } from '../config/routes';
 import { DataTable, ColumnConfig, ActionButton } from '../components/ui/DataTable';
 import { SearchFilter } from '../components/ui/SearchFilter';
-import { DateTimeUtil } from '../utils';
+import { DateTimeUtil, EncryptionUtil } from '../utils';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Site } from '../types/site.type';
+import { Alert } from '~/components';
+import { APIUtil } from "~/utils/api.util";
+import { requireAuth } from "~/config/session.server";
+
+interface LoaderData {
+  sites: Site[];
+  error?: string;
+}
+
+// Loader function to fetch sites data and protect the route
+export async function loader({ request }: LoaderFunctionArgs) {
+  console.log("=== SITE MANAGEMENT LOADER START ===");
+  
+  // Use the centralized authentication utility
+  const session = requireAuth(request);
+  
+  console.log("Site management auth token found:", session.authToken?.substring(0, 20) + "...");
+  console.log("Site management authentication passed, proceeding to fetch data");
+
+  try {
+    // TODO: Implement actual API call to fetch sites
+    return json({ sites: [] });
+  } catch (error) {
+    console.error("Error fetching sites:", error);
+    return json({ 
+      sites: [], 
+      error: "Failed to fetch sites data" 
+    }, { status: 500 });
+  }
+}
 
 const SiteManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +47,18 @@ const SiteManagement: React.FC = () => {
   // State
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   // Sample data - this would normally come from API
   const allSites: Site[] = [
@@ -207,7 +250,7 @@ const SiteManagement: React.FC = () => {
   ];
 
   // Initialize sites data on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     setSites(allSites);
   }, []);
 
@@ -247,26 +290,50 @@ const SiteManagement: React.FC = () => {
   };
 
   const handleViewSite = (siteId: string) => {
-    // Navigate to site detail page
-    window.location.href = `/dashboard/site/site-management/${siteId}`;
+    try {
+      // Encrypt the site ID
+      const encryptedSiteId = EncryptionUtil.encryptParam(siteId);
+      // Navigate to site edit page
+      navigate(`/dashboard/site/site-management/edit/${encryptedSiteId}`);
+    } catch (error) {
+      console.error('Failed to encrypt site ID:', error);
+      // Fallback to basic navigation if encryption fails
+      navigate('/dashboard/site/site-management');
+    }
   };
 
   const handleDeleteSite = (siteId: string, siteName: string) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the site "${siteName}"?\n\nThis action cannot be undone.`
-    );
-    
-    if (confirmed) {
-      // Filter out the deleted site from the current sites state
-      const updatedSites = sites.filter(site => site.id !== siteId);
-      setSites(updatedSites);
-      
-      // In a real application, you would make an API call here
-      console.log(`Deleting site with ID: ${siteId}`);
-      
-      // Optional: Show success message
-      alert(`Site "${siteName}" has been deleted successfully.`);
-    }
+    setAlert({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Site',
+      message: `Are you sure you want to delete the site "${siteName}"?\n\nThis action cannot be undone.`,
+      onConfirm: () => {
+        // Filter out the deleted site from the current sites state
+        const updatedSites = sites.filter(site => site.id !== siteId);
+        setSites(updatedSites);
+        
+        // In a real application, you would make an API call here
+        console.log(`Deleting site with ID: ${siteId}`);
+        
+        // Show success message
+        setAlert({
+          isOpen: true,
+          type: 'success',
+          title: 'Site Deleted',
+          message: `Site "${siteName}" has been deleted successfully.`
+        });
+      }
+    });
+  };
+
+  const closeAlert = () => {
+    setAlert({
+      isOpen: false,
+      type: 'info',
+      title: '',
+      message: ''
+    });
   };
 
   if (!routeConfig) {
@@ -301,6 +368,20 @@ const SiteManagement: React.FC = () => {
           className="border rounded-lg min-w-full"
         />
       </div>
+
+      {/* Alert */}
+      {alert.isOpen && (
+        <Alert
+          isOpen={alert.isOpen}
+          title={alert.title}
+          message={alert.message}
+          type={alert.type}
+          onClose={closeAlert}
+          onConfirm={alert.onConfirm}
+          confirmText="Delete"
+          cancelText="Cancel"
+        />
+      )}
     </PageLayout>
   );
 };

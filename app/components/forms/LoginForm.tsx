@@ -233,6 +233,7 @@ export function LoginForm({ onSubmit, error, fieldErrors, showMfaField = false }
 
         <Button
           type="submit"
+          variant="primary"
           loading={isSubmitting}
           className="submit-button"
         >

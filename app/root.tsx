@@ -6,7 +6,6 @@ import {
   ScrollRestoration,
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
-import { AlertContainer } from "~/components/ui/Alert";
 import { useEffect } from "react";
 import { ThemeManager } from "~/utils/theme.util";
 
@@ -16,7 +15,6 @@ import "./styles/components/input.css";
 import "./styles/components/button.css";
 import "./styles/components/breadcrumb.css";
 import "./styles/components/login-form.css";
-import "./styles/components/theme-demo.css";
 import "./styles/components/dashboard.css";
 import "./styles/components/data-table.css";
 import "./styles/global-overrides.css"; // Global browser overrides - must be last
@@ -79,7 +77,6 @@ export default function App() {
   return (
     <>
       <Outlet />
-      <AlertContainer />
     </>
   );
 }

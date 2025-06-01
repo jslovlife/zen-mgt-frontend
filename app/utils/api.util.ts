@@ -26,6 +26,7 @@ export interface LoginResponse {
   requireMfa?: boolean; // Indicates MFA verification is required
   requireMfaSetup?: boolean; // Indicates MFA setup is needed
   recoveryCodes?: string[]; // Recovery codes after MFA setup
+  tempToken?: string; // Temporary token for MFA scenarios
 }
 
 export interface MfaSetupRequest {
@@ -123,6 +124,7 @@ export class APIUtil {
         // Handle common errors
         if (error.response?.status === 401) {
           this.clearAuthToken();
+          this.clearTempToken();
           // Redirect to login if needed
         }
         return Promise.reject(error);
@@ -145,6 +147,22 @@ export class APIUtil {
   private clearAuthToken(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('authToken');
+    }
+  }
+
+  private getTempToken(): string | null {
+    return typeof window !== 'undefined' ? localStorage.getItem('tempToken') : null;
+  }
+
+  private setTempToken(token: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tempToken', token);
+    }
+  }
+
+  private clearTempToken(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tempToken');
     }
   }
 
@@ -247,6 +265,12 @@ export class APIUtil {
       this.setAuthToken(response.data.token);
     }
     
+    // Also handle temp token for MFA scenarios
+    if (response.success && response.data?.tempToken) {
+      console.log("Setting temp token for MFA flow");
+      this.setTempToken(response.data.tempToken);
+    }
+    
     console.log("=== APIUtil.login END ===");
     return response;
   }
@@ -343,6 +367,7 @@ export class APIUtil {
   public async logout(): Promise<ApiResponse<void>> {
     const response = await this.post<void>(API_CONFIG.ENDPOINTS.LOGOUT);
     this.clearAuthToken();
+    this.clearTempToken();
     return response;
   }
 
@@ -352,5 +377,9 @@ export class APIUtil {
 
   public isAuthenticated(): boolean {
     return !!this.getAuthToken();
+  }
+
+  public hasTempToken(): boolean {
+    return !!this.getTempToken();
   }
 } 

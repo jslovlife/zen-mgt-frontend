@@ -3,6 +3,7 @@ export { Button } from './ui/Button';
 export { Breadcrumb } from './ui/Breadcrumb';
 export { SideNavbar } from './ui/SideNavbar';
 export { DataTable } from './ui/DataTable';
+export { Alert } from './ui/Alert';
 
 // Layout Components
 export { PageLayout } from './layout/PageLayout';
@@ -17,6 +18,7 @@ export type {
   DataType 
 } from './ui/DataTable';
 export type { PageLayoutProps } from './layout/PageLayout';
+export type { AlertProps } from './ui/Alert';
 
 // Form Components
 export { Input } from './forms/Input';

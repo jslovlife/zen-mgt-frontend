@@ -9,6 +9,7 @@
   padding: var(--spacing-8);
   max-width: 400px;
   width: 100%;
+  margin: 0 auto;
 }
 
 .login-form-header {
@@ -184,6 +185,9 @@
 .submit-button {
   width: 100%;
   margin-top: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
 }
 
 .login-form-footer {
