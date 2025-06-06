@@ -4,8 +4,10 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "@remix-run/react";
-import type { LinksFunction } from "@remix-run/node";
+import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useEffect } from "react";
 import { ThemeManager } from "~/utils/theme.util";
 
@@ -41,7 +43,18 @@ export const links: LinksFunction = () => [
   },
 ];
 
+// Loader to pass environment variables to the client
+export async function loader({ request }: LoaderFunctionArgs) {
+  return json({
+    ENV: {
+      API_URL: process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:8080',
+    },
+  });
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useLoaderData<typeof loader>();
+  
   return (
     <html lang="en">
       <head>
@@ -53,6 +66,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <ScrollRestoration />
+        {/* Pass environment variables to the client */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.ENV = ${JSON.stringify(data.ENV)}`,
+          }}
+        />
         <Scripts />
       </body>
     </html>
