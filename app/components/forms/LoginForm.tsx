@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -97,8 +97,21 @@ export function LoginForm({ onSubmit, error, fieldErrors, showMfaField = false }
     }
   };
 
-  // Show MFA field if either backend says so OR local check says so
-  const shouldShowMfaField = showMfaField || showMfaFieldLocal;
+  // Show MFA field if backend explicitly says so (priority), OR local check says so (when no backend error)
+  const shouldShowMfaField = showMfaField || (!error && showMfaFieldLocal);
+
+  // Clear frontend MFA status when there's a backend error, or sync with backend MFA requirement
+  useEffect(() => {
+    if (error) {
+      // Clear frontend status when there's an error to avoid conflicts
+      setShowMfaFieldLocal(false);
+      setMfaCheckMessage("");
+    } else if (showMfaField) {
+      // Backend explicitly requires MFA - sync frontend state
+      setShowMfaFieldLocal(true);
+      setMfaCheckMessage("✓ MFA is enabled for this account");
+    }
+  }, [error, showMfaField]);
 
   return (
     <div className="login-form-container">
@@ -160,8 +173,8 @@ export function LoginForm({ onSubmit, error, fieldErrors, showMfaField = false }
           onBlur={handleUsernameBlur}
         />
 
-        {/* MFA Status Message */}
-        {(isCheckingMfa || mfaCheckMessage) && (
+        {/* MFA Status Message - Only show if no backend error */}
+        {!error && (isCheckingMfa || mfaCheckMessage) && (
           <div className="mfa-status-message">
             {isCheckingMfa ? (
               <div className="mfa-checking">
@@ -190,21 +203,21 @@ export function LoginForm({ onSubmit, error, fieldErrors, showMfaField = false }
           error={errors.password?.message || fieldErrors?.password?.[0]}
         />
 
-        {/* MFA Code Field - Show conditionally or with toggle */}
+        {/* MFA Code Field - Show conditionally with proper priority */}
         {shouldShowMfaField && (
           <Input
             {...register("mfaCode")}
             type="text"
             id="mfaCode"
             name="mfaCode"
-            label={showMfaFieldLocal ? "Authentication Code" : "Authentication Code (Optional)"}
+            label={showMfaField ? "Authentication Code" : "Authentication Code (Optional)"}
             placeholder="000000"
             autoComplete="one-time-code"
             maxLength={6}
             className="mfa-code-input"
             error={errors.mfaCode?.message || fieldErrors?.mfaCode?.[0]}
             helperText={
-              showMfaFieldLocal 
+              showMfaField 
                 ? "Enter the 6-digit code from your authenticator app"
                 : "Enter the 6-digit code from your authenticator app (if you have MFA enabled)"
             }

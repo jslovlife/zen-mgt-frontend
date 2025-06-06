@@ -52,7 +52,7 @@ export class AuthService {
         }
 
         // Scenario 2: User needs MFA setup
-        if (data.mfaSetupRequired && data.tempToken) {
+        if (data.requireMfaSetup && data.tempToken) {
           this.alertHandler.info("MFA setup required", "Please set up two-factor authentication");
           return {
             success: true,
@@ -100,9 +100,9 @@ export class AuthService {
   }
 
   // Scenario 2: MFA Setup Flow
-  public async initiateMfaSetup(): Promise<{ success: boolean; data?: MfaSetupResponse; error?: string }> {
+  public async initiateMfaSetup(username: string): Promise<{ success: boolean; data?: MfaSetupResponse; error?: string }> {
     try {
-      const response = await this.apiUtil.initiateMfaSetup();
+      const response = await this.apiUtil.initiateMfaSetup(username);
 
       if (response.success && response.data) {
         this.alertHandler.info("MFA setup initiated", "Scan the QR code with your authenticator app");
@@ -192,13 +192,25 @@ export class AuthService {
   }
 
   public async logout(): Promise<void> {
+    console.log("=== AuthService.logout START ===");
+    
     try {
-      await this.apiUtil.logout();
-      this.alertHandler.info("You have been logged out successfully");
+      const response = await this.apiUtil.logout();
+      
+      if (response.success) {
+        this.alertHandler.success("You have been logged out successfully", "Goodbye!");
+        console.log("=== AuthService.logout SUCCESS ===");
+      } else {
+        this.alertHandler.warning("Logged out locally, but server logout may have failed", "Logout");
+        console.warn("Server logout failed but continuing with local logout");
+      }
     } catch (error) {
       // Even if logout fails on server, clear local session
-      this.alertHandler.warning("Logged out locally, but server logout may have failed");
+      console.error("Logout error:", error);
+      this.alertHandler.warning("Logged out locally, but server logout may have failed", "Logout");
     }
+    
+    console.log("=== AuthService.logout END ===");
   }
 
   public async refreshToken(): Promise<{ success: boolean; user?: AuthUser }> {

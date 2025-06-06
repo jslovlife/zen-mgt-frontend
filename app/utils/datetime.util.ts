@@ -248,6 +248,16 @@ export class DateTimeUtil {
     return this.toMediumDateTime(input);
   }
 
+  // Standardized table datetime format: yyyy-mm-dd hh24:mm:ss
+  static forTableDateTime(input: DateInput): string {
+    return this.toCustomFormat(input, 'YYYY-MM-DD HH:mm:ss');
+  }
+
+  // Standardized table date format: yyyy-mm-dd
+  static forTableDate(input: DateInput): string {
+    return this.toCustomFormat(input, 'YYYY-MM-DD');
+  }
+
   // Form input formats
   static forDateInput(input: DateInput): string {
     return this.toISODate(input);
@@ -257,6 +267,13 @@ export class DateTimeUtil {
     if (!this.isValidDate(input)) return '';
     const date = this.toDate(input);
     return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+  }
+
+  // Form input format with seconds (for datetime-local with step="1")
+  static forDateTimeInputWithSeconds(input: DateInput): string {
+    if (!this.isValidDate(input)) return '';
+    const date = this.toDate(input);
+    return date.toISOString().slice(0, 19); // YYYY-MM-DDTHH:mm:ss
   }
 
   // API formats
@@ -328,8 +345,11 @@ export const {
   toISODate,
   forTable,
   forTableWithTime,
+  forTableDateTime,
+  forTableDate,
   forDateInput,
   forDateTimeInput,
+  forDateTimeInputWithSeconds,
   forAPI,
   forDisplay,
   forDisplayWithTime,

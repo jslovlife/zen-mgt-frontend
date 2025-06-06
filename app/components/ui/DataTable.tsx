@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from './Button';
 import { Search } from 'lucide-react';
+import { DateTimeUtil } from '~/utils/datetime.util';
 
 // Action Button Component for table actions
 export type ActionButtonVariant = 'info' | 'error' | 'success' | 'warning' | 'primary';
@@ -188,7 +189,7 @@ export function DataTable<T extends Record<string, any>>({
     
     switch (dataType) {
       case 'timestamp':
-        return new Date(value as string | number | Date).toLocaleString();
+        return DateTimeUtil.forTableDateTime(value);
       case 'number':
         return typeof value === 'number' ? value.toLocaleString() : value.toString();
       case 'boolean':
@@ -202,8 +203,31 @@ export function DataTable<T extends Record<string, any>>({
   const filteredData = data.filter(record => {
     return Object.entries(filterValues).every(([key, value]) => {
       if (!value) return true;
+      
       const cellValue = record[key];
-      return cellValue?.toString().toLowerCase().includes(value.toLowerCase());
+      if (cellValue === null || cellValue === undefined) return false;
+      
+      // Get the column configuration to check data type
+      const column = displayColumns.find(col => col.key === key);
+      
+      // For timestamp fields, format both the cell value and filter value consistently
+      if (column?.dataType === 'timestamp') {
+        try {
+          // Format the cell value using the same format as displayed in the table
+          const formattedCellValue = DateTimeUtil.forTableDateTime(cellValue);
+          // The filter value might be a partial datetime string, so normalize it
+          const normalizedFilterValue = value.toLowerCase().trim();
+          
+          // Check if the formatted cell value includes the filter value
+          return formattedCellValue.toLowerCase().includes(normalizedFilterValue);
+        } catch (error) {
+          // Fallback to string comparison if date parsing fails
+          return cellValue.toString().toLowerCase().includes(value.toLowerCase());
+        }
+      }
+      
+      // For other data types, use the standard string comparison
+      return cellValue.toString().toLowerCase().includes(value.toLowerCase());
     });
   });
 

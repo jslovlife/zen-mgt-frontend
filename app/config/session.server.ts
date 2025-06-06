@@ -28,6 +28,11 @@ export interface AuthSessionData {
   tokenExpiration?: Date | null;
   user?: {
     username?: string;
+    id?: number;
+    userGroupId?: number;
+    hashedUserId?: string;  // NEW: Hashed User ID from JWT
+    hashedUserGroupId?: string;  // NEW: Hashed User Group ID from JWT
+    hasEnhancedSecurity?: boolean;  // NEW: Whether token has enhanced security features
     // Add more user fields as needed
   };
 }
@@ -142,7 +147,27 @@ export function getAuthSession(request: Request): AuthSessionData {
   
   // Get user info from token
   const payload = decodeJWTPayload(authToken);
-  const user = payload ? { username: payload.sub } : undefined;
+  
+  // Debug JWT token contents in development
+  if (process.env.NODE_ENV === 'development' && payload) {
+    console.log("=== JWT TOKEN DEBUG ===");
+    console.log("Available claims:", Object.keys(payload));
+    console.log("Username (sub):", payload.sub);
+    console.log("User ID (id/userId):", payload.id || payload.userId);
+    console.log("Hashed User ID (huid):", payload.huid || "NOT PRESENT");
+    console.log("Hashed User Group ID (hgid):", payload.hgid || "NOT PRESENT");
+    console.log("Enhanced Security Available:", !!(payload.huid && payload.hgid));
+    console.log("Token Expiry:", payload.exp ? new Date(payload.exp * 1000).toISOString() : "Unknown");
+    console.log("========================");
+  }
+  
+  const user = payload ? { 
+    username: payload.sub,
+    id: payload.userId || payload.id, // Support both 'userId' and 'id' field names (legacy)
+    hashedUserId: payload.huid,  // NEW: Hashed User ID
+    hashedUserGroupId: payload.hgid,  // NEW: Hashed User Group ID
+    hasEnhancedSecurity: !!(payload.huid && payload.hgid)  // NEW: Enhanced security detection
+  } : undefined;
   
   return {
     isAuthenticated: !isExpired,
@@ -281,4 +306,97 @@ export const createSessionCookie = {
   auto: (token: string) => createAuthCookie(token, { 
     useTokenExpiration: true 
   }),
-}; 
+};
+
+/**
+ * Enhanced JWT utility functions for enhanced security integration
+ */
+export class JWTUtil {
+  /**
+   * Extract all claims from JWT token
+   */
+  static extractClaims(token: string): any {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Failed to extract JWT claims:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract username from token
+   */
+  static extractUsername(token: string): string | null {
+    const claims = this.extractClaims(token);
+    return claims?.sub || null;
+  }
+
+  /**
+   * Extract hashed user ID from token
+   */
+  static extractHashedUserId(token: string): string | null {
+    const claims = this.extractClaims(token);
+    return claims?.huid || null;
+  }
+
+  /**
+   * Extract hashed user group ID from token
+   */
+  static extractHashedUserGroupId(token: string): string | null {
+    const claims = this.extractClaims(token);
+    return claims?.hgid || null;
+  }
+
+  /**
+   * Check if token is expired
+   */
+  static isTokenExpired(token: string): boolean {
+    const claims = this.extractClaims(token);
+    if (!claims?.exp) return true;
+    
+    const currentTime = Math.floor(Date.now() / 1000);
+    return claims.exp < currentTime;
+  }
+
+  /**
+   * Get token expiration time
+   */
+  static getTokenExpiration(token: string): Date | null {
+    const claims = this.extractClaims(token);
+    return claims?.exp ? new Date(claims.exp * 1000) : null;
+  }
+
+  /**
+   * Check if user has enhanced security features
+   */
+  static hasEnhancedSecurity(token: string): boolean {
+    const claims = this.extractClaims(token);
+    return !!(claims?.huid && claims?.hgid);
+  }
+
+  /**
+   * Debug utility for development
+   */
+  static logTokenInfo(token: string) {
+    if (process.env.NODE_ENV !== 'development') return;
+    
+    const claims = this.extractClaims(token);
+    console.group('🔐 JWT Token Information');
+    console.log('Username:', claims?.sub);
+    console.log('Hashed User ID:', claims?.huid ? 'Present' : 'Missing');
+    console.log('Hashed User Group ID:', claims?.hgid ? 'Present' : 'Missing');
+    console.log('Issued At:', new Date((claims?.iat || 0) * 1000));
+    console.log('Expires At:', new Date((claims?.exp || 0) * 1000));
+    console.log('Enhanced Security:', !!(claims?.huid && claims?.hgid));
+    console.groupEnd();
+  }
+} 

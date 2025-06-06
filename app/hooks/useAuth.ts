@@ -12,7 +12,7 @@ interface UseAuthReturn {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   // MFA methods
-  initiateMfaSetup: () => Promise<{ success: boolean; data?: MfaSetupResponse; error?: string }>;
+  initiateMfaSetup: (username: string) => Promise<{ success: boolean; data?: MfaSetupResponse; error?: string }>;
   enableMfa: (mfaCode: string) => Promise<AuthResult>;
   verifyMfa: (mfaCode: string) => Promise<AuthResult>;
 }
@@ -95,11 +95,11 @@ export function useAuth(): UseAuthReturn {
   };
 
   // MFA Setup Methods (Scenario 2)
-  const initiateMfaSetup = async () => {
+  const initiateMfaSetup = async (username: string) => {
     setIsLoading(true);
     
     try {
-      const result = await authService.initiateMfaSetup();
+      const result = await authService.initiateMfaSetup(username);
       return result;
     } finally {
       setIsLoading(false);

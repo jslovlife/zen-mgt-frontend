@@ -6,6 +6,7 @@ import { LoginForm } from "~/components/forms/LoginForm";
 import { APIUtil, type LoginRequest } from "~/utils/api.util";
 import { GlobalAlertMessageHandler } from "~/utils/alert.util";
 import { createAuthCookie } from "~/config/session.server";
+import { EnumService } from "~/services/enum.service";
 
 // Validation schema
 const loginSchema = z.object({
@@ -26,6 +27,36 @@ type ActionData = {
 };
 
 // Note: Using createAuthCookie from ~/config/session.server
+
+// Helper function to load and cache enums
+async function loadAndCacheEnums(token: string) {
+  try {
+    console.log("=== LOADING ENUMS AFTER LOGIN ===");
+    const enumService = EnumService.getInstance();
+    const enums = await enumService.getAllEnums(token);
+    
+    // Cache enums in server response (will be sent to client)
+    const enumData = {
+      data: enums,
+      timestamp: Date.now(),
+      token: token.substring(0, 20) + "..." // For debugging
+    };
+    
+    console.log("Enums loaded and ready for caching:", {
+      recordStatuses: enums.recordStatuses?.length || 0,
+      approvalRequestTypes: enums.approvalRequestTypes?.length || 0,
+      approvalStatuses: enums.approvalStatuses?.length || 0,
+      sysApprovalRequestStatuses: enums.sysApprovalRequestStatuses?.length || 0,
+      referenceTypes: enums.referenceTypes?.length || 0,
+    });
+    
+    return enumData;
+  } catch (error) {
+    console.error("Failed to load enums during login:", error);
+    // Don't fail login if enums fail - they can be loaded later
+    return null;
+  }
+}
 
 // Action function to handle form submission
 export async function action({ request }: ActionFunctionArgs) {
@@ -100,6 +131,9 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("Scenario 1: Direct login with token");
         console.log("Token received:", data.token.substring(0, 20) + "...");
         
+        // Load enums for caching
+        const enumData = await loadAndCacheEnums(data.token);
+        
         console.log("=== CREATING AUTH COOKIE ===");
         const cookieValue = createAuthCookie(data.token);
         console.log("Cookie value:", cookieValue);
@@ -107,8 +141,12 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("=== SETTING REDIRECT FLAG AND USING SERVER REDIRECT ===");
         console.log("Using traditional redirect() to force navigation");
         
-        // Store a flag in client-side for redirect detection
-        return redirect("/dashboard", {
+        // Create redirect with enum caching
+        const redirectUrl = enumData 
+          ? `/dashboard?enumCache=${encodeURIComponent(JSON.stringify(enumData))}`
+          : "/dashboard";
+        
+        return redirect(redirectUrl, {
           headers: {
             "Set-Cookie": cookieValue,
           },
@@ -139,6 +177,9 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("Scenario 3: MFA verification successful");
         console.log("Token received:", data.token.substring(0, 20) + "...");
         
+        // Load enums for caching
+        const enumData = await loadAndCacheEnums(data.token);
+        
         console.log("Creating MFA redirect response with cookie");
         
         console.log("=== CREATING MFA AUTH COOKIE ===");
@@ -148,7 +189,12 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("=== MFA SERVER REDIRECT ===");
         console.log("Using traditional redirect() for MFA success");
         
-        return redirect("/dashboard", {
+        // Create redirect with enum caching
+        const redirectUrl = enumData 
+          ? `/dashboard?enumCache=${encodeURIComponent(JSON.stringify(enumData))}`
+          : "/dashboard";
+        
+        return redirect(redirectUrl, {
           headers: {
             "Set-Cookie": cookieValue,
           },
@@ -164,16 +210,17 @@ export async function action({ request }: ActionFunctionArgs) {
       console.log("=== API CALL FAILED ===");
       console.log("response:", response);
       
+      const errorMessage = response.error || "Login failed";
+      
       // Check if this is an MFA-required error but user didn't provide MFA code
-      if (response.status === 401 && !result.data.mfaCode) {
-        console.log("Login failed - might need MFA code");
+      if ((response.status === 401 && !result.data.mfaCode) || errorMessage === "MFA verification required") {
+        console.log("Login failed - MFA code required");
         return json({ 
-          error: "Login failed. If you have MFA enabled, please enter your authentication code.",
+          error: errorMessage === "MFA verification required" ? errorMessage : "Login failed. If you have MFA enabled, please enter your authentication code.",
           showMfaField: true 
         }, { status: 200 });
       }
       
-      const errorMessage = response.error || "Login failed";
       return json({ error: errorMessage }, { status: response.status || 401 });
     }
   } catch (error) {

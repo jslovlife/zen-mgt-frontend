@@ -21,4 +21,24 @@ export default defineConfig({
     }),
     tsconfigPaths(),
   ],
+  build: {
+    // Disable source maps in production for security
+    sourcemap: process.env.NODE_ENV === 'development' && process.env.VITE_SOURCEMAP !== 'false',
+    // Additional security settings
+    minify: process.env.NODE_ENV === 'production' ? 'terser' : false,
+    rollupOptions: {
+      output: {
+        // Obfuscate chunk names in production
+        manualChunks: process.env.NODE_ENV === 'production' ? undefined : undefined,
+        chunkFileNames: process.env.NODE_ENV === 'production' ? 'assets/[hash].js' : 'assets/[name]-[hash].js',
+        entryFileNames: process.env.NODE_ENV === 'production' ? 'assets/[hash].js' : 'assets/[name]-[hash].js',
+        assetFileNames: process.env.NODE_ENV === 'production' ? 'assets/[hash].[ext]' : 'assets/[name]-[hash].[ext]'
+      }
+    }
+  },
+  // Development server security (optional)
+  server: {
+    // Only allow localhost in development
+    host: process.env.NODE_ENV === 'development' ? 'localhost' : false,
+  }
 });

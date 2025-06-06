@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "remix vite:build",
+    "build:prod": "NODE_ENV=production remix vite:build",
+    "build:secure": "NODE_ENV=production VITE_SOURCEMAP=false remix vite:build",
     "dev": "remix vite:dev",
+    "dev:secure": "NODE_ENV=development VITE_SOURCEMAP=false remix vite:dev",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc"

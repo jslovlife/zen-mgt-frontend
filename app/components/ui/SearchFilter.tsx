@@ -210,7 +210,12 @@ export function SearchFilter<T extends Record<string, any>>({
                 >
                   <span className="flex items-center gap-1">
                     <span className="font-medium">{column?.title}:</span>
-                    <span className="font-normal">{value}</span>
+                    <span className="font-normal">
+                      {column?.filterOptions ? 
+                        column.filterOptions.find(opt => opt.value.toString() === value.toString())?.label || value 
+                        : value
+                      }
+                    </span>
                   </span>
                   <span className="text-white/80 hover:text-white text-lg leading-none ml-1">×</span>
                 </button>
