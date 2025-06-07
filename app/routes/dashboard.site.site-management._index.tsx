@@ -10,7 +10,7 @@ import { PageLayout } from '../components/layout/PageLayout';
 import { Site } from '../types/site.type';
 import { Alert } from '~/components';
 import { APIUtil } from "~/utils/api.util";
-import { requireAuth } from "~/config/session.server";
+import { getSecureAuthToken } from "~/config/session.server";
 
 interface LoaderData {
   sites: Site[];
@@ -21,11 +21,13 @@ interface LoaderData {
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== SITE MANAGEMENT LOADER START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
+  // Use secure session authentication
+  const authToken = await getSecureAuthToken(request);
   
-  console.log("Site management auth token found:", session.authToken?.substring(0, 20) + "...");
-  console.log("Site management authentication passed, proceeding to fetch data");
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
 
   try {
     // TODO: Implement actual API call to fetch sites

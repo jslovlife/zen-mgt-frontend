@@ -8,19 +8,39 @@ import { Site } from '../types/site.type';
 import { type LoaderFunctionArgs, type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useActionData, useNavigation } from "@remix-run/react";
 import { APIUtil } from "~/utils/api.util";
-import { requireAuth } from "~/config/session.server";
+import { getSecureAuthToken } from "~/config/session.server";
+import { Alert } from '~/components';
 
 // Loader function to protect the route
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== SITE INSERT LOADER START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
+  // Use secure session authentication
+  const authToken = await getSecureAuthToken(request);
   
-  console.log("Site insert auth token found:", session.authToken?.substring(0, 20) + "...");
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  console.log("Site insert auth token found:", authToken.substring(0, 20) + "...");
   console.log("Site insert authentication passed, allowing access");
   
   return null;
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  console.log("=== SITE INSERT ACTION START ===");
+  
+  // Use secure session authentication
+  const authToken = await getSecureAuthToken(request);
+  
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  // ... existing code ...
 }
 
 const SiteInsert: React.FC = () => {

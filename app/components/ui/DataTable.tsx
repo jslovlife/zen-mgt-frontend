@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from './Button';
+import { CustomDropdown } from './CustomDropdown';
 import { Search } from 'lucide-react';
 import { DateTimeUtil } from '~/utils/datetime.util';
 
@@ -123,6 +124,18 @@ export interface DataTableProps<T = any> {
   rowKey?: keyof T | ((record: T) => string);
   className?: string;
   emptyText?: string;
+  // External pagination support
+  externalPagination?: {
+    total: number;
+    page: number;
+    totalPages: number;
+    pageSize: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    onSortChange?: (sortBy: string, sortDir: 'asc' | 'desc') => void;
+  };
 }
 
 interface SortState {
@@ -140,7 +153,8 @@ export function DataTable<T extends Record<string, any>>({
   pageSize = 10,
   rowKey = 'id',
   className = '',
-  emptyText = 'No data available'
+  emptyText = 'No data available',
+  externalPagination
 }: DataTableProps<T>) {
   // Filter out searchable-only columns for table display
   // Show columns that have filterable=true OR don't have searchable=true
@@ -416,6 +430,143 @@ export function DataTable<T extends Record<string, any>>({
               >
                 Next
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* External Backend Pagination Controls */}
+        {externalPagination && (
+          <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
+            {/* Left: Results info and page size */}
+            <div className="flex items-center space-x-6">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium text-gray-900">{externalPagination.total}</span> items
+                {externalPagination.total > 0 && (
+                  <span className="ml-2">
+                    (page {externalPagination.page} of {externalPagination.totalPages})
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-600">Show:</label>
+                <CustomDropdown
+                  value={externalPagination.pageSize.toString()}
+                  onChange={(value) => {
+                    console.log('🔧 PageSize Dropdown DEBUG:', { 
+                      selectedValue: value, 
+                      selectedValueType: typeof value,
+                      currentPageSize: externalPagination.pageSize,
+                      currentPageSizeType: typeof externalPagination.pageSize,
+                      currentPageSizeString: externalPagination.pageSize.toString(),
+                      parsedValue: parseInt(value),
+                      willCall: 'onPageSizeChange'
+                    });
+                    externalPagination.onPageSizeChange(parseInt(value));
+                  }}
+                  placeholder="Page Size"
+                  options={[
+                    { label: '10', value: '10' },
+                    { label: '20', value: '20' },
+                    { label: '50', value: '50' },
+                    { label: '100', value: '100' }
+                  ]}
+                  className="w-28"
+                  style={{ minWidth: '112px', height: '42px' }}
+                />
+              </div>
+            </div>
+
+            {/* Center: Sorting controls */}
+            {externalPagination.onSortChange && (
+              <div className="flex items-center space-x-3">
+                <label className="text-sm text-gray-600">Sort:</label>
+                <CustomDropdown
+                  value={externalPagination.sortBy || ''}
+                  onChange={(value) => {
+                    console.log('🔧 DataTable Sort Dropdown onChange:', { 
+                      selectedValue: value, 
+                      currentSortBy: externalPagination.sortBy,
+                      currentSortDir: externalPagination.sortDir,
+                      valueType: typeof value 
+                    });
+                    externalPagination.onSortChange!(value, externalPagination.sortDir || 'asc');
+                  }}
+                  placeholder="Sort By"
+                  options={[
+                    { label: 'User Code', value: 'userCode' },
+                    { label: 'Username', value: 'username' },
+                    { label: 'First Name', value: 'firstName' },
+                    { label: 'Last Name', value: 'lastName' },
+                    { label: 'Email', value: 'email' },
+                    { label: 'Created Date', value: 'createdAt' },
+                    { label: 'Last Login', value: 'lastLoginAt' }
+                  ]}
+                  className="w-48"
+                  style={{ minWidth: '192px', height: '42px' }}
+                />
+                
+                <button
+                  onClick={() => {
+                    externalPagination.onSortChange!(
+                      externalPagination.sortBy || 'userCode',
+                      externalPagination.sortDir === 'asc' ? 'desc' : 'asc'
+                    );
+                  }}
+                  className="px-3 py-1 text-sm bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-purple-700 disabled:opacity-50"
+                  style={{ height: '42px' }}
+                  disabled={loading}
+                >
+                  {externalPagination.sortDir === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            )}
+            
+            {/* Right: Navigation controls - Always show when external pagination is enabled */}
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => {
+                  externalPagination.onPageChange(1);
+                }}
+                disabled={externalPagination.page <= 1 || loading}
+                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ««
+              </button>
+              
+              <button
+                onClick={() => {
+                  externalPagination.onPageChange(externalPagination.page - 1);
+                }}
+                disabled={externalPagination.page <= 1 || loading}
+                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ‹
+              </button>
+              
+              <span className="px-4 py-1 text-sm font-medium text-white bg-purple-600 border-t border-b border-purple-600">
+                {externalPagination.page}
+              </span>
+              
+              <button
+                onClick={() => {
+                  externalPagination.onPageChange(externalPagination.page + 1);
+                }}
+                disabled={externalPagination.page >= externalPagination.totalPages || loading}
+                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ›
+              </button>
+              
+              <button
+                onClick={() => {
+                  externalPagination.onPageChange(externalPagination.totalPages);
+                }}
+                disabled={externalPagination.page >= externalPagination.totalPages || loading}
+                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                »»
+              </button>
             </div>
           </div>
         )}

@@ -302,6 +302,70 @@ export class UserService {
   }
 
   /**
+   * Toggle user status between Active and Inactive
+   */
+  public async toggleUserStatus(hashedUserId: string): Promise<UserServiceResult<{ success: boolean; message: string; newStatus: string }>> {
+    try {
+      console.log("=== UserService.toggleUserStatus START ===", { hashedUserId });
+      
+      const response = await this.apiUtil.toggleUserStatus(hashedUserId);
+      
+      console.log("=== UserService.toggleUserStatus API RESPONSE ===");
+      console.log("Response success:", response.success);
+      console.log("Response data:", response.data);
+      console.log("Response error:", response.error);
+      console.log("Response status:", response.status);
+      
+      if (response.success && response.data) {
+        console.log("=== UserService.toggleUserStatus SUCCESS ===");
+        const statusText = response.data.newStatus === 'ACTIVE' ? 'activated' : 'deactivated';
+        this.alertHandler.success(`User ${statusText} successfully!`, `The user has been ${statusText}`);
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        const errorMessage = response.error || "Failed to toggle user status";
+        console.error("UserService.toggleUserStatus failed:", errorMessage);
+        console.error("Full response object:", response);
+        
+        // Try to get more specific error information
+        let detailedError = errorMessage;
+        if (response.status) {
+          detailedError += ` (HTTP ${response.status})`;
+        }
+        
+        this.alertHandler.error(detailedError, "Status Toggle Failed");
+        return {
+          success: false,
+          error: detailedError
+        };
+      }
+    } catch (error) {
+      const errorMessage = "An unexpected error occurred while toggling user status";
+      console.error("UserService.toggleUserStatus exception:", error);
+      console.error("Error type:", typeof error);
+      console.error("Error details:", error);
+      
+      // Try to extract more details from the error
+      let detailedError = errorMessage;
+      if (error instanceof Error) {
+        detailedError += `: ${error.message}`;
+      } else if (typeof error === 'string') {
+        detailedError += `: ${error}`;
+      }
+      
+      this.alertHandler.error(detailedError, "Status Toggle Error");
+      return {
+        success: false,
+        error: detailedError
+      };
+    } finally {
+      console.log("=== UserService.toggleUserStatus END ===");
+    }
+  }
+
+  /**
    * Update user session validity
    */
   public async updateUserSessionValidity(hashedUserId: string, sessionData: SessionValidityRequest): Promise<UserServiceResult<SessionValidityResponse>> {
@@ -336,6 +400,173 @@ export class UserService {
       };
     } finally {
       console.log("=== UserService.updateUserSessionValidity END ===");
+    }
+  }
+
+  /**
+   * Reset user password
+   */
+  public async resetUserPassword(hashedUserId: string): Promise<UserServiceResult<{ success: boolean; message: string }>> {
+    try {
+      console.log("=== UserService.resetUserPassword START ===", { hashedUserId });
+      
+      const response = await this.apiUtil.resetUserPassword(hashedUserId);
+      
+      if (response.success && response.data) {
+        console.log("=== UserService.resetUserPassword SUCCESS ===");
+        this.alertHandler.success("Password reset successfully!", response.data.message || "User password has been reset");
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        const errorMessage = response.error || "Failed to reset password";
+        console.error("UserService.resetUserPassword failed:", errorMessage);
+        this.alertHandler.error(errorMessage, "Password Reset Failed");
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error) {
+      const errorMessage = "An unexpected error occurred while resetting password";
+      console.error("UserService.resetUserPassword exception:", error);
+      this.alertHandler.error(errorMessage, "Password Reset Error");
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      console.log("=== UserService.resetUserPassword END ===");
+    }
+  }
+
+  /**
+   * Reset user MFA
+   */
+  public async resetUserMFA(hashedUserId: string): Promise<UserServiceResult<{ success: boolean; message: string }>> {
+    try {
+      console.log("=== UserService.resetUserMFA START ===", { hashedUserId });
+      
+      const response = await this.apiUtil.resetUserMFA(hashedUserId);
+      
+      if (response.success && response.data) {
+        console.log("=== UserService.resetUserMFA SUCCESS ===");
+        this.alertHandler.success("MFA reset successfully!", response.data.message || "User MFA has been reset");
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        const errorMessage = response.error || "Failed to reset MFA";
+        console.error("UserService.resetUserMFA failed:", errorMessage);
+        this.alertHandler.error(errorMessage, "MFA Reset Failed");
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error) {
+      const errorMessage = "An unexpected error occurred while resetting MFA";
+      console.error("UserService.resetUserMFA exception:", error);
+      this.alertHandler.error(errorMessage, "MFA Reset Error");
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      console.log("=== UserService.resetUserMFA END ===");
+    }
+  }
+
+  /**
+   * Toggle user MFA enable/disable
+   */
+  public async toggleUserMFA(hashedUserId: string, enabled: boolean): Promise<UserServiceResult<{ success: boolean; message: string; enabled: boolean }>> {
+    try {
+      console.log("=== UserService.toggleUserMFA START ===", { hashedUserId, enabled });
+      
+      const response = await this.apiUtil.toggleUserMFA(hashedUserId, enabled);
+      
+      if (response.success && response.data) {
+        console.log("=== UserService.toggleUserMFA SUCCESS ===");
+        const action = enabled ? "enabled" : "disabled";
+        this.alertHandler.success(`MFA ${action} successfully!`, response.data.message || `User MFA has been ${action}`);
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        const errorMessage = response.error || "Failed to toggle MFA";
+        console.error("UserService.toggleUserMFA failed:", errorMessage);
+        this.alertHandler.error(errorMessage, "MFA Toggle Failed");
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error) {
+      const errorMessage = "An unexpected error occurred while toggling MFA";
+      console.error("UserService.toggleUserMFA exception:", error);
+      this.alertHandler.error(errorMessage, "MFA Toggle Error");
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      console.log("=== UserService.toggleUserMFA END ===");
+    }
+  }
+
+  /**
+   * Get user security status
+   */
+  public async getUserSecurityStatus(hashedUserId: string): Promise<UserServiceResult<{
+    encryptedUserId: string;
+    username: string;
+    password: {
+      hasPassword: boolean;
+      lastUpdated: string;
+    };
+    mfa: {
+      enabled: boolean;
+      enforced: boolean;
+      hasSecret: boolean;
+      hasRecoveryCodes: boolean;
+      setupRequired: boolean;
+    };
+    recordStatus: string;
+    lastLoginAt: string;
+    createdAt: string;
+  }>> {
+    try {
+      console.log("=== UserService.getUserSecurityStatus START ===", { hashedUserId });
+      
+      const response = await this.apiUtil.getUserSecurityStatus(hashedUserId);
+      
+      if (response.success && response.data) {
+        console.log("=== UserService.getUserSecurityStatus SUCCESS ===");
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        const errorMessage = response.error || "Failed to get security status";
+        console.error("UserService.getUserSecurityStatus failed:", errorMessage);
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error) {
+      const errorMessage = "An unexpected error occurred while getting security status";
+      console.error("UserService.getUserSecurityStatus exception:", error);
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      console.log("=== UserService.getUserSecurityStatus END ===");
     }
   }
 

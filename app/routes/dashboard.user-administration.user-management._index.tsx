@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { LoaderFunctionArgs, json } from "@remix-run/node";
+import React, { useState, useEffect } from 'react';
+import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Users } from 'lucide-react';
 import { useNavigate, useLoaderData } from '@remix-run/react';
-import { DataTable, ColumnConfig, ActionButton } from '~/components/ui/DataTable';
-import { SearchableDropdown } from '~/components/ui/SearchableDropdown';
+import { DataTable, ColumnConfig, ActionButton, SearchFilterV2 } from '~/components/ui';
+import type { SearchFieldConfig } from '~/components/ui';
 import { DateTimeUtil } from '~/utils';
 import { PageLayout } from '~/components/layout/PageLayout';
 import { User } from '~/types/user.type';
 import { Alert } from '~/components';
 import { UserService } from "~/services";
-import { requireAuth } from "~/config/session.server";
+import { getSecureAuthToken } from "~/config/session.server";
 import { UserSearchCriteria, SearchUtils, USER_SEARCH_CONFIG } from "~/types/search.type";
 import { useEnums } from "~/routes/dashboard";
 import { useRecordStatusHelpers } from "~/hooks/useEnums";
@@ -26,122 +26,194 @@ interface LoaderData {
   sortBy: string;
   sortDir: 'asc' | 'desc';
   error?: string;
+  sessionExpired?: boolean;
 }
 
 // Loader function to fetch users data and protect the route
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== USER MANAGEMENT LOADER START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
-  
-  console.log("User management auth token found:", session.authToken?.substring(0, 20) + "...");
-  console.log("User management authentication passed, proceeding to fetch data");
-
-  // Extract search criteria using the enhanced search architecture
-  const url = new URL(request.url);
-  const searchCriteria = SearchUtils.URLParamsToCriteria(url.searchParams, USER_SEARCH_CONFIG);
-  
-  // Set defaults
-  const page = searchCriteria.page || 1;
-  const size = searchCriteria.size || USER_SEARCH_CONFIG.defaultPageSize;
-  const sortBy = searchCriteria.sortBy || USER_SEARCH_CONFIG.defaultSortBy;
-  const sortDir = searchCriteria.sortDir || USER_SEARCH_CONFIG.defaultSortDir;
-  
-  console.log("Extracted search criteria with named parameter mapping:", searchCriteria);
-  console.log("Pagination params:", { page, size, sortBy, sortDir });
-
   try {
-    // Fetch users from UserService with enhanced search capabilities
-    const userService = UserService.getInstance();
+    // Use secure session authentication
+    const authToken = await getSecureAuthToken(request);
     
-    // Inject the server-side auth token for this request
-    if (session.authToken) {
-      userService.setServerAuthToken(session.authToken);
+    if (!authToken) {
+      console.log("❌ No secure session found, redirecting to login");
+      throw redirect("/login");
     }
     
-    let result;
+    console.log("User management auth token found:", authToken.substring(0, 20) + "...");
+    console.log("User management authentication passed, proceeding to fetch data");
+
+    // Extract search criteria using the enhanced search architecture
+    const url = new URL(request.url);
+    const searchCriteria = SearchUtils.URLParamsToCriteria(url.searchParams, USER_SEARCH_CONFIG);
     
-    // Check if we have any search criteria beyond basic pagination
-    const hasSearchCriteria = Object.keys(searchCriteria).some(key => 
-      !['page', 'size', 'sortBy', 'sortDir'].includes(key) && 
-      searchCriteria[key] !== null && 
-      searchCriteria[key] !== undefined && 
-      searchCriteria[key] !== ''
-    );
+    // Set defaults
+    const page = searchCriteria.page || 1;
+    const size = searchCriteria.size || USER_SEARCH_CONFIG.defaultPageSize;
+    const sortBy = searchCriteria.sortBy || USER_SEARCH_CONFIG.defaultSortBy;
+    const sortDir = searchCriteria.sortDir || USER_SEARCH_CONFIG.defaultSortDir;
     
-    if (hasSearchCriteria) {
-      // Use flexible search with named parameter implementation
-      console.log("Using flexible search with named parameters");
-      const flexibleSearchCriteria: UserSearchCriteria = {
-        page,
-        size,
-        sortBy,
-        sortDir,
-        ...searchCriteria
-      };
+    console.log("Extracted search criteria with named parameter mapping:", searchCriteria);
+    console.log("Pagination params:", { page, size, sortBy, sortDir });
+
+    try {
+      // Fetch users from UserService with enhanced search capabilities
+      const userService = UserService.getInstance();
       
-      const flexibleResult = await userService.searchUsersFlexible(flexibleSearchCriteria);
+      // Inject the server-side auth token for this request
+      if (authToken) {
+        userService.setServerAuthToken(authToken);
+      }
       
-      if (flexibleResult.success && flexibleResult.data) {
-        // Transform SearchResponse<User> to match the expected format
-        result = {
-          success: true,
-          data: {
-            users: flexibleResult.data.content || [],
-            total: flexibleResult.data.totalElements || 0,
-            page: flexibleResult.data.page || page,
-            totalPages: flexibleResult.data.totalPages || 0,
-            pageSize: flexibleResult.data.size || size
-          }
+      let result;
+      
+      // Check if we have any search criteria beyond basic pagination
+      const hasSearchCriteria = Object.keys(searchCriteria).some(key => 
+        !['page', 'size', 'sortBy', 'sortDir'].includes(key) && 
+        searchCriteria[key] !== null && 
+        searchCriteria[key] !== undefined && 
+        searchCriteria[key] !== ''
+      );
+      
+      if (hasSearchCriteria) {
+        // Use flexible search with named parameter implementation
+        console.log("Using flexible search with named parameters");
+        const flexibleSearchCriteria: UserSearchCriteria = {
+          page,
+          size,
+          sortBy,
+          sortDir,
+          ...searchCriteria
         };
+        
+        const flexibleResult = await userService.searchUsersFlexible(flexibleSearchCriteria);
+        
+        if (flexibleResult.success && flexibleResult.data) {
+          // Transform SearchResponse<User> to match the expected format
+          result = {
+            success: true,
+            data: {
+              users: flexibleResult.data.content || [],
+              total: flexibleResult.data.totalElements || 0,
+              page: flexibleResult.data.page || page,
+              totalPages: flexibleResult.data.totalPages || 0,
+              pageSize: flexibleResult.data.size || size
+            }
+          };
+        } else {
+          result = {
+            success: false,
+            error: flexibleResult.error || "Search failed"
+          };
+        }
       } else {
-        result = {
-          success: false,
-          error: flexibleResult.error || "Search failed"
-        };
-      }
-    } else {
-      // Use regular pagination endpoint for basic listing
-      console.log("Using basic pagination endpoint");
-      result = await userService.getUsers(page, size, sortBy, sortDir);
-    }
-
-    console.log("Final API result:", result);
-    
-    // Clear the server-side token after use
-    userService.clearServerAuthToken();
-    
-    if (result.success && result.data) {
-      console.log("result.data structure:", {
-        hasUsers: !!result.data.users,
-        usersLength: result.data.users?.length,
-        total: result.data.total,
-        page: result.data.page,
-        totalPages: result.data.totalPages,
-        pageSize: result.data.pageSize
-      });
-
-      // Validate the data structure
-      if (!Array.isArray(result.data.users)) {
-        console.error("Users data is not an array:", result.data.users);
-        throw new Error("Invalid users data format");
+        // Use regular pagination endpoint for basic listing
+        console.log("Using basic pagination endpoint");
+        result = await userService.getUsers(page, size, sortBy, sortDir);
       }
 
-      return json({ 
-        users: result.data.users,
-        pagination: {
-          total: result.data.total || 0,
-          page: result.data.page || 1,
-          totalPages: result.data.totalPages || 0,
-          pageSize: result.data.pageSize || size
-        },
-        searchCriteria: searchCriteria,
-        sortBy: sortBy,
-        sortDir: sortDir
-      });
-    } else {
-      console.error("Failed to fetch users:", result.error);
+      console.log("Final API result:", result);
+      
+      // Clear the server-side token after use
+      userService.clearServerAuthToken();
+      
+      if (result.success && result.data) {
+        console.log("result.data structure:", {
+          hasUsers: !!result.data.users,
+          usersLength: result.data.users?.length,
+          total: result.data.total,
+          page: result.data.page,
+          totalPages: result.data.totalPages,
+          pageSize: result.data.pageSize
+        });
+
+        // Validate the data structure
+        if (!Array.isArray(result.data.users)) {
+          console.error("Users data is not an array:", result.data.users);
+          throw new Error("Invalid users data format");
+        }
+
+        return json({ 
+          users: result.data.users,
+          pagination: {
+            total: result.data.total || 0,
+            page: result.data.page || 1,
+            totalPages: result.data.totalPages || 0,
+            pageSize: result.data.pageSize || size
+          },
+          searchCriteria: searchCriteria,
+          sortBy: sortBy,
+          sortDir: sortDir
+        });
+      } else {
+        // Check if the error indicates session expiration or unauthorized access
+        const errorMessage = result.error || "Failed to fetch users data";
+        const isUnauthorized = errorMessage.toLowerCase().includes('unauthorized') || 
+                              errorMessage.toLowerCase().includes('403') || 
+                              errorMessage.toLowerCase().includes('401');
+        
+        if (isUnauthorized) {
+          console.error("Session expired or unauthorized access detected");
+          return json({ 
+            users: [], 
+            pagination: {
+              total: 0,
+              page: 1,
+              totalPages: 0,
+              pageSize: size
+            },
+            searchCriteria: searchCriteria,
+            sortBy: sortBy,
+            sortDir: sortDir,
+            sessionExpired: true,
+            error: "Session has expired"
+          }, { status: 401 });
+        }
+        
+        console.error("Failed to fetch users:", result.error);
+        return json({ 
+          users: [], 
+          pagination: {
+            total: 0,
+            page: 1,
+            totalPages: 0,
+            pageSize: size
+          },
+          searchCriteria: searchCriteria,
+          sortBy: sortBy,
+          sortDir: sortDir,
+          error: result.error || "Failed to fetch users data" 
+        }, { status: 500 });
+      }
+    } catch (apiError) {
+      console.error("API Error fetching users:", apiError);
+      
+      // Check if it's an authentication error
+      const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+      const isUnauthorized = errorMessage.toLowerCase().includes('unauthorized') || 
+                            errorMessage.toLowerCase().includes('403') || 
+                            errorMessage.toLowerCase().includes('401');
+      
+      if (isUnauthorized) {
+        console.error("Session expired during API call");
+        return json({ 
+          users: [], 
+          pagination: {
+            total: 0,
+            page: 1,
+            totalPages: 0,
+            pageSize: size
+          },
+          searchCriteria: searchCriteria,
+          sortBy: sortBy,
+          sortDir: sortDir,
+          sessionExpired: true,
+          error: "Session has expired"
+        }, { status: 401 });
+      }
+      
       return json({ 
         users: [], 
         pagination: {
@@ -153,30 +225,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
         searchCriteria: searchCriteria,
         sortBy: sortBy,
         sortDir: sortDir,
-        error: result.error || "Failed to fetch users data" 
+        error: "Failed to fetch users data" 
       }, { status: 500 });
     }
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return json({ 
-      users: [], 
-      pagination: {
-        total: 0,
-        page: 1,
-        totalPages: 0,
-        pageSize: size
-      },
-      searchCriteria: searchCriteria,
-      sortBy: sortBy,
-      sortDir: sortDir,
-      error: "Failed to fetch users data" 
-    }, { status: 500 });
+  } catch (authError) {
+    console.error("Authentication error in loader:", authError);
+    // This will redirect to login
+    throw redirect("/login");
   }
 }
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { users, pagination, searchCriteria, sortBy, sortDir, error } = useLoaderData<LoaderData>();
+  const { users, pagination, searchCriteria, sortBy, sortDir, error, sessionExpired } = useLoaderData<LoaderData>();
+  
+  // Debug pagination data
+  console.log("=== USER MANAGEMENT COMPONENT PAGINATION DEBUG ===");
+  console.log("Received pagination data:", pagination);
+  console.log("Current page:", pagination.page);
+  console.log("Total pages:", pagination.totalPages);
+  console.log("Page size:", pagination.pageSize);
+  console.log("Total items:", pagination.total);
+  console.log("Users count:", users.length);
   
   // Get enums from dashboard context with error handling
   let recordStatuses: any[] = [];
@@ -228,19 +298,9 @@ const UserManagement: React.FC = () => {
   
   // State
   const [loading, setLoading] = useState(false);
-  const [currentFormValues, setCurrentFormValues] = useState<Record<string, string>>(() => {
-    // Initialize with current search criteria
-    return {
-      username: searchCriteria.username || '',
-      userCode: searchCriteria.userCode || '',
-      email: searchCriteria.email || '',
-      recordStatus: searchCriteria.recordStatus || '',
-      createdDateFrom: searchCriteria.createdDateFrom || '',
-      createdDateTo: searchCriteria.createdDateTo || '',
-      lastLoginFrom: searchCriteria.lastLoginFrom || '',
-      lastLoginTo: searchCriteria.lastLoginTo || ''
-    };
-  });
+  const [pendingPageSize, setPendingPageSize] = useState<number | null>(null);
+  const [pendingSortBy, setPendingSortBy] = useState<string | null>(null);
+  const [pendingSortDir, setPendingSortDir] = useState<'asc' | 'desc' | null>(null);
   const [alert, setAlert] = useState<{
     isOpen: boolean;
     type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
@@ -254,29 +314,53 @@ const UserManagement: React.FC = () => {
     message: ''
   });
 
-  // Update form values when search criteria changes (e.g., from URL)
-  React.useEffect(() => {
-    setCurrentFormValues({
-      username: searchCriteria.username || '',
-      userCode: searchCriteria.userCode || '',
-      email: searchCriteria.email || '',
-      recordStatus: searchCriteria.recordStatus || '',
-      createdDateFrom: searchCriteria.createdDateFrom || '',
-      createdDateTo: searchCriteria.createdDateTo || '',
-      lastLoginFrom: searchCriteria.lastLoginFrom || '',
-      lastLoginTo: searchCriteria.lastLoginTo || ''
+  // Clear pending states when loader data changes
+  useEffect(() => {
+    console.log('🔧 useEffect clearing pending states triggered by:', {
+      newPageSize: pagination.pageSize,
+      newSortBy: sortBy,
+      newSortDir: sortDir,
+      currentPendingPageSize: pendingPageSize,
+      currentPendingSortBy: pendingSortBy,
+      currentPendingSortDir: pendingSortDir
     });
-  }, [searchCriteria]);
+    
+    // Only clear pending page size if it matches the new loaded value
+    if (pendingPageSize !== null && pendingPageSize === pagination.pageSize) {
+      console.log('🔧 Clearing pendingPageSize because it matches loaded value');
+      setPendingPageSize(null);
+    }
+    
+    // Only clear pending sort if it matches the new loaded values
+    if (pendingSortBy !== null && pendingSortBy === sortBy) {
+      console.log('🔧 Clearing pendingSortBy because it matches loaded value');
+      setPendingSortBy(null);
+    }
+    
+    if (pendingSortDir !== null && pendingSortDir === sortDir) {
+      console.log('🔧 Clearing pendingSortDir because it matches loaded value');
+      setPendingSortDir(null);
+    }
+  }, [pagination.pageSize, sortBy, sortDir, pendingPageSize, pendingSortBy, pendingSortDir]);
 
-  // Handle form input changes
-  const handleInputChange = (field: string, value: string) => {
-    setCurrentFormValues(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  // Handle session expiration
+  React.useEffect(() => {
+    if (sessionExpired) {
+      console.log("🔒 Session expired detected, showing alert");
+      setAlert({
+        isOpen: true,
+        type: 'warning',
+        title: 'Session Expired',
+        message: 'Your session has expired. You will be redirected to the login page.',
+        onConfirm: () => {
+          console.log("🔒 Redirecting to login due to session expiration");
+          navigate('/login', { replace: true });
+        }
+      });
+    }
+  }, [sessionExpired, navigate]);
 
-  // Handle search from FlexibleSearchFilter component
+  // Handle search from SearchFilterV2 component
   const handleSearch = async (searchValues: Record<string, any>) => {
     const url = new URL(window.location.href);
     
@@ -290,17 +374,22 @@ const UserManagement: React.FC = () => {
     url.searchParams.delete('exactMatch');
     url.searchParams.delete('caseSensitive');
     
-    // Set new search parameters
+    // Set new search parameters with field mapping
     Object.entries(searchValues).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== '') {
+        // Map SearchFilterV2 field names to expected backend field names
+        let mappedKey = key;
+        
+        // Handle timestamp field mapping
+        if (key === 'createdDateFrom') mappedKey = 'createdDateFrom';
+        if (key === 'createdDateTo') mappedKey = 'createdDateTo';
+        if (key === 'lastLoginFrom') mappedKey = 'lastLoginFrom';
+        if (key === 'lastLoginTo') mappedKey = 'lastLoginTo';
+        
         if (Array.isArray(value)) {
-          url.searchParams.set(key, value.join(','));
-        } else if (typeof value === 'object' && value !== null) {
-          // Handle date ranges
-          if (value.from) url.searchParams.set(`${key}From`, value.from);
-          if (value.to) url.searchParams.set(`${key}To`, value.to);
+          url.searchParams.set(mappedKey, value.join(','));
         } else {
-          url.searchParams.set(key, value.toString());
+          url.searchParams.set(mappedKey, value.toString());
         }
       }
     });
@@ -311,25 +400,39 @@ const UserManagement: React.FC = () => {
 
   // Handle pagination navigation
   const handlePageChange = (newPage: number) => {
+    console.log("🔄 Page change requested:", newPage);
+    console.log("Current pagination state:", pagination);
     const url = new URL(window.location.href);
     url.searchParams.set('page', newPage.toString());
+    console.log("New URL:", `${url.pathname}${url.search}`);
     navigate(`${url.pathname}${url.search}`, { replace: true });
   };
 
   // Handle page size change
   const handlePageSizeChange = (newSize: number) => {
+    console.log("📏 Page size change requested:", newSize);
+    console.log("Current pagination state:", pagination);
+    console.log("Setting pendingPageSize to:", newSize);
+    setPendingPageSize(newSize); // Set pending state immediately
     const url = new URL(window.location.href);
     url.searchParams.set('size', newSize.toString());
     url.searchParams.delete('page'); // Reset to first page
+    console.log("New URL:", `${url.pathname}${url.search}`);
     navigate(`${url.pathname}${url.search}`, { replace: true });
   };
 
   // Handle sorting change
   const handleSortChange = (newSortBy: string, newSortDir: 'asc' | 'desc') => {
+    console.log("🔄 Sort change requested:", { newSortBy, newSortDir });
+    console.log("Current sort state:", { sortBy, sortDir });
+    console.log("Setting pending sort to:", { newSortBy, newSortDir });
+    setPendingSortBy(newSortBy); // Set pending state immediately
+    setPendingSortDir(newSortDir);
     const url = new URL(window.location.href);
     url.searchParams.set('sortBy', newSortBy);
     url.searchParams.set('sortDir', newSortDir);
     url.searchParams.delete('page'); // Reset to first page on sort change
+    console.log("New URL:", `${url.pathname}${url.search}`);
     navigate(`${url.pathname}${url.search}`, { replace: true });
   };
 
@@ -353,6 +456,61 @@ const UserManagement: React.FC = () => {
     recordStatusDisplay: recordStatusHelpers?.getDisplayByCode(user.recordStatus) || user.recordStatus?.toString() || 'Unknown'
   }));
 
+  // Configure search fields for SearchFilterV2
+  const searchFields: SearchFieldConfig[] = [
+    {
+      key: 'username',
+      label: 'Username',
+      type: 'text',
+      placeholder: 'Search by username...'
+    },
+    {
+      key: 'userCode',
+      label: 'User Code',
+      type: 'text',
+      placeholder: 'Search by user code...'
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      type: 'text',
+      placeholder: 'Search by email...'
+    },
+    {
+      key: 'recordStatus',
+      label: 'Status',
+      type: 'dropdown',
+      options: recordStatusHelpers?.getSelectOptions() || [
+        { label: 'Active', value: '1' },
+        { label: 'Inactive', value: '2' }
+      ]
+    },
+    {
+      key: 'createdDate',
+      label: 'Created',
+      type: 'timestamp',
+      gridCols: 2
+    },
+    {
+      key: 'lastLogin',
+      label: 'Last Login',
+      type: 'timestamp',
+      gridCols: 2
+    }
+  ];
+
+  // Prepare initial values for SearchFilterV2
+  const searchInitialValues = {
+    username: searchCriteria.username || '',
+    userCode: searchCriteria.userCode || '',
+    email: searchCriteria.email || '',
+    recordStatus: searchCriteria.recordStatus || '',
+    createdDateFrom: searchCriteria.createdDateFrom || '',
+    createdDateTo: searchCriteria.createdDateTo || '',
+    lastLoginFrom: searchCriteria.lastLoginFrom || '',
+    lastLoginTo: searchCriteria.lastLoginTo || ''
+  };
+
   // Column configuration for DataTable
   const columns: ColumnConfig<User>[] = [
     {
@@ -361,7 +519,6 @@ const UserManagement: React.FC = () => {
       dataType: 'string',
       sortable: true,
       filterable: true,
-      searchable: true,
       render: (value: string, record: User) => (
         <div className="font-medium text-gray-900">{value}</div>
       )
@@ -372,7 +529,6 @@ const UserManagement: React.FC = () => {
       dataType: 'string',
       sortable: true,
       filterable: true,
-      searchable: true,
       render: (value: string) => (
         <div className="text-gray-600 font-mono text-sm">{value}</div>
       )
@@ -383,7 +539,6 @@ const UserManagement: React.FC = () => {
       dataType: 'string',
       sortable: true,
       filterable: true,
-      searchable: true,
       render: (value: string) => (
         <div className="text-gray-600">{value}</div>
       )
@@ -394,11 +549,10 @@ const UserManagement: React.FC = () => {
       dataType: 'string',
       sortable: true,
       filterable: true,
-      searchable: true,
-      filterOptions: recordStatusHelpers?.getSelectOptions()?.map((option: any) => ({
-        value: option.label,
-        label: option.label
-      })) || [],
+      filterOptions: [
+        { value: 'Active', label: 'Active' },
+        { value: 'Inactive', label: 'Inactive' }
+      ],
       render: (value: string, record: any) => {
         const originalValue = record.recordStatus;
         const displayText = recordStatusHelpers.getDisplayByCode(originalValue);
@@ -447,9 +601,36 @@ const UserManagement: React.FC = () => {
       dataType: 'string',
       sortable: false,
       filterable: false,
-      searchable: false,
       render: (value: any, record: User) => (
         <div className="flex items-center gap-2">
+          {/* Status Toggle Section */}
+          <div className="flex items-center gap-1">
+            <span className={`
+              px-2 py-1 rounded-full text-xs font-medium
+              ${Number(record.recordStatus) === 1 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-red-100 text-red-800'
+              }
+            `}>
+              {Number(record.recordStatus) === 1 ? 'Active' : 'Inactive'}
+            </span>
+            <button
+              onClick={() => handleToggleStatus(record.hashedUserId, record.username, Number(record.recordStatus || 0))}
+              disabled={loading}
+              className={`
+                px-2 py-1 text-xs font-medium rounded border transition-colors
+                ${Number(record.recordStatus) === 1
+                  ? 'text-red-600 border-red-300 hover:bg-red-50'
+                  : 'text-green-600 border-green-300 hover:bg-green-50'
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+              title={`Click to ${Number(record.recordStatus) === 1 ? 'deactivate' : 'activate'} user`}
+            >
+              {Number(record.recordStatus) === 1 ? 'Deactivate' : 'Activate'}
+            </button>
+          </div>
+          
           <ActionButton
             variant="primary"
             onClick={() => handleViewUser(record.hashedUserId)}
@@ -526,25 +707,140 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  // Handle toggle user status
+  const handleToggleStatus = async (hashedUserId: string, username: string, currentStatus: number) => {
+    setLoading(true);
+    try {
+      const userService = UserService.getInstance();
+      
+      // Make sure to use server-side auth if available (for consistency with other API calls)
+      // Note: This might be needed to prevent auth issues
+      
+      const result = await userService.toggleUserStatus(hashedUserId);
+      
+      if (result.success && result.data) {
+        // Show success message immediately, then reload
+        setAlert({
+          isOpen: true,
+          type: 'success',
+          title: 'Status Updated',
+          message: `User "${username}" status has been changed to ${result.data.newStatus}.`
+        });
+        
+        // Reload the page after a short delay to show the success message
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        throw new Error(result.error || 'Failed to toggle user status');
+      }
+    } catch (error) {
+      console.error('Toggle status error:', error);
+      
+      // Don't redirect to logout on toggle failure - stay on page and show error
+      setAlert({
+        isOpen: true,
+        type: 'error',
+        title: 'Status Toggle Error',
+        message: `Failed to toggle user status for "${username}". Please check your connection and try again.`
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Close alert
   const closeAlert = () => {
     setAlert(prev => ({ ...prev, isOpen: false }));
   };
 
+  // Debug externalPagination values before rendering
+  const externalPaginationValues = {
+    total: pagination.total,
+    page: pagination.page,
+    totalPages: pagination.totalPages,
+    pageSize: pendingPageSize ?? pagination.pageSize,
+    sortBy: pendingSortBy ?? sortBy,
+    sortDir: pendingSortDir ?? sortDir,
+  };
+  
+  console.log('🔧 UserManagement externalPagination values:', {
+    originalPageSize: pagination.pageSize,
+    pendingPageSize,
+    finalPageSize: externalPaginationValues.pageSize,
+    originalSortBy: sortBy,
+    pendingSortBy,
+    finalSortBy: externalPaginationValues.sortBy,
+    originalSortDir: sortDir,
+    pendingSortDir,
+    finalSortDir: externalPaginationValues.sortDir
+  });
+
   // Show error if data loading failed
-  if (error) {
+  if (error && !sessionExpired) {
+    // For debugging pagination, create mock data when there's an auth error
+    const mockUsers = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      hashedUserId: `mock-${i}`,
+      username: `user${i + 1}`,
+      userCode: `USR${String(i + 1).padStart(3, '0')}`,
+      email: `user${i + 1}@example.com`,
+      recordStatus: i % 2 === 0 ? '1' : '2',
+      sessionValidity: 3600000,
+      lastLoginAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'ACTIVE'
+    })) as User[];
+
+    const mockPagination = {
+      total: 25,
+      page: 1,
+      totalPages: 3,
+      pageSize: 10
+    };
+
+    console.log("🧪 Using mock data for pagination testing due to auth error");
+
     return (
-      <PageLayout title="User Management" icon={<Users />}>
-        <div className="text-center py-12">
-          <div className="text-red-600 text-lg font-medium">Error Loading Users</div>
-          <div className="text-gray-600 mt-2">{error}</div>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <PageLayout title="User Management (Mock Data)" icon={<Users />}>
+        <div className="mb-4 p-4 bg-red-100 border border-red-300 rounded-lg">
+          <div className="text-red-800 font-medium">Authentication Error - Using Mock Data</div>
+          <div className="text-red-600 text-sm mt-1">{error}</div>
         </div>
+
+        {/* Mock Data Table with Integrated Pagination */}
+        <DataTable
+          data={mockUsers.slice(0, 10)} // Show first 10 for page 1
+          columns={columns}
+          loading={false}
+          enableFilter={true}
+          enableSorter={true}
+          enablePagination={false}
+          pageSize={mockPagination.pageSize}
+          emptyText="No users found"
+          externalPagination={{
+            total: mockPagination.total,
+            page: mockPagination.page,
+            totalPages: mockPagination.totalPages,
+            pageSize: mockPagination.pageSize,
+            onPageChange: handlePageChange,
+            onPageSizeChange: handlePageSizeChange,
+            sortBy: sortBy,
+            sortDir: sortDir,
+            onSortChange: handleSortChange
+          }}
+        />
+
+        {/* Alert Modal */}
+        <Alert
+          isOpen={alert.isOpen}
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onClose={closeAlert}
+          onConfirm={alert.onConfirm}
+        />
       </PageLayout>
     );
   }
@@ -557,301 +853,16 @@ const UserManagement: React.FC = () => {
       onAddClick={handleAddUser}
     >
 
-      {/* Direct Search Form - All searchable columns displayed with search button */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            console.log("=== FORM SUBMISSION DEBUG ===");
-            console.log("Current form values state:", currentFormValues);
-            
-            // Use controlled state values instead of FormData to capture SearchableDropdown values
-            const searchValues: Record<string, any> = {};
-            
-            // Include all non-empty values from controlled state
-            Object.entries(currentFormValues).forEach(([key, value]) => {
-              if (value && value.toString().trim()) {
-                searchValues[key] = value.toString().trim();
-                console.log(`Including ${key}: ${value}`);
-              }
-            });
-            
-            console.log("Final search values to submit:", searchValues);
-            handleSearch(searchValues);
-          }}
-          className="space-y-4"
-        >
-          {/* Search Fields Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={currentFormValues.username}
-                onChange={(e) => handleInputChange('username', e.target.value)}
-                placeholder="Search by username..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
+      {/* SearchFilterV2 Component */}
+      <SearchFilterV2
+        fields={searchFields}
+        onSearch={handleSearch}
+        initialValues={searchInitialValues}
+        loading={loading}
+        title="Search Users"
+      />
 
-            {/* User Code */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                User Code
-              </label>
-              <input
-                type="text"
-                name="userCode"
-                value={currentFormValues.userCode}
-                onChange={(e) => handleInputChange('userCode', e.target.value)}
-                placeholder="Search by user code..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="text"
-                name="email"
-                value={currentFormValues.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Search by email..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <SearchableDropdown
-                options={[
-                  { label: 'All Status', value: '' },
-                  ...recordStatusHelpers.getSelectOptions()
-                ]}
-                value={currentFormValues.recordStatus}
-                onChange={(value) => handleInputChange('recordStatus', value)}
-                placeholder="All Status"
-                className="w-full"
-              />
-            </div>
-
-            {/* Created Date From */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Created From
-              </label>
-              <input
-                type="datetime-local"
-                name="createdDateFrom"
-                value={currentFormValues.createdDateFrom}
-                onChange={(e) => handleInputChange('createdDateFrom', e.target.value)}
-                step="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-
-            {/* Created Date To */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Created To
-              </label>
-              <input
-                type="datetime-local"
-                name="createdDateTo"
-                value={currentFormValues.createdDateTo}
-                onChange={(e) => handleInputChange('createdDateTo', e.target.value)}
-                step="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-
-            {/* Last Login From */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Login From
-              </label>
-              <input
-                type="datetime-local"
-                name="lastLoginFrom"
-                value={currentFormValues.lastLoginFrom}
-                onChange={(e) => handleInputChange('lastLoginFrom', e.target.value)}
-                step="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-
-            {/* Last Login To */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Login To
-              </label>
-              <input
-                type="datetime-local"
-                name="lastLoginTo"
-                value={currentFormValues.lastLoginTo}
-                onChange={(e) => handleInputChange('lastLoginTo', e.target.value)}
-                step="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Active Search Criteria Bubbles */}
-          {(() => {
-            const hasActiveFilters = Object.keys(currentFormValues).some(key => 
-              !['page', 'size', 'sortBy', 'sortDir'].includes(key) && 
-              currentFormValues[key] !== null && 
-              currentFormValues[key] !== undefined && 
-              currentFormValues[key] !== ''
-            );
-            
-            console.log("=== ACTIVE FILTERS DEBUG ===");
-            console.log("Search criteria:", currentFormValues);
-            console.log("Has active filters:", hasActiveFilters);
-            console.log("Filtered criteria:", Object.entries(currentFormValues).filter(([key, value]) => 
-              !['page', 'size', 'sortBy', 'sortDir'].includes(key) && value !== null && value !== undefined && value !== ''
-            ));
-            
-            return hasActiveFilters;
-          })() && (
-            <div className="border-t border-gray-200 pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium text-gray-700">Active Filters:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(currentFormValues).map(([key, value]) => {
-                  if (['page', 'size', 'sortBy', 'sortDir'].includes(key) || !value || value === '') {
-                    return null;
-                  }
-                  
-                  const getFilterLabel = (key: string, value: any) => {
-                    switch (key) {
-                      case 'username': return `Username: ${value}`;
-                      case 'userCode': return `User Code: ${value}`;
-                      case 'email': return `Email: ${value}`;
-                      case 'recordStatus': {
-                        // Find the label for the status value
-                        const statusOptions = recordStatusHelpers?.getSelectOptions() || [];
-                        const statusOption = statusOptions.find((option: any) => option.value === value);
-                        const statusLabel = statusOption?.label || value;
-                        return `Status: ${statusLabel}`;
-                      }
-                      case 'createdDateFrom': return `Created From: ${new Date(value).toLocaleString()}`;
-                      case 'createdDateTo': return `Created To: ${new Date(value).toLocaleString()}`;
-                      case 'lastLoginFrom': return `Login From: ${new Date(value).toLocaleString()}`;
-                      case 'lastLoginTo': return `Login To: ${new Date(value).toLocaleString()}`;
-                      default: return `${key}: ${value}`;
-                    }
-                  };
-
-                  return (
-                    <div
-                      key={key}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full border border-purple-200"
-                    >
-                      <span>{getFilterLabel(key, value)}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Clear the form field
-                          setCurrentFormValues(prev => ({
-                            ...prev,
-                            [key]: ''
-                          }));
-                          
-                          // Update URL
-                          const url = new URL(window.location.href);
-                          url.searchParams.delete(key);
-                          navigate(`${url.pathname}${url.search}`, { replace: true });
-                        }}
-                        className="ml-1 hover:bg-purple-200 rounded-full p-0.5 transition-colors"
-                        title="Remove filter"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  );
-                })}
-                
-                {/* Clear All Filters Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Clear form values state
-                    setCurrentFormValues({
-                      username: '',
-                      userCode: '',
-                      email: '',
-                      recordStatus: '',
-                      createdDateFrom: '',
-                      createdDateTo: '',
-                      lastLoginFrom: '',
-                      lastLoginTo: ''
-                    });
-                    
-                    // Reset the actual form elements
-                    const form = document.querySelector('form') as HTMLFormElement;
-                    if (form) {
-                      form.reset();
-                      
-                      // Manually clear datetime-local inputs (sometimes form.reset() doesn't work with these)
-                      const datetimeInputs = form.querySelectorAll('input[type="datetime-local"]');
-                      datetimeInputs.forEach((input: any) => {
-                        input.value = '';
-                      });
-                      
-                      // Manually clear text inputs
-                      const textInputs = form.querySelectorAll('input[type="text"]');
-                      textInputs.forEach((input: any) => {
-                        input.value = '';
-                      });
-                      
-                      // Note: SearchableDropdown is controlled via currentFormValues state, so clearing the state is sufficient
-                    }
-                    
-                    // Clear search and navigate to clean URL
-                    handleSearch({});
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full border border-gray-300 hover:bg-gray-200 transition-colors"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Clear All
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Search Button and Reset */}
-          <div className="flex items-center justify-end pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 text-sm font-medium text-white bg-purple-600 border border-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <span>{loading ? 'Searching...' : 'Search'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Data Table */}
+      {/* Data Table with Integrated Pagination */}
       <DataTable
         data={transformedUsers}
         columns={columns}
@@ -861,102 +872,18 @@ const UserManagement: React.FC = () => {
         enablePagination={false}
         pageSize={pagination.pageSize}
         emptyText="No users found"
+        externalPagination={{
+          total: externalPaginationValues.total,
+          page: externalPaginationValues.page,
+          totalPages: externalPaginationValues.totalPages,
+          pageSize: externalPaginationValues.pageSize,
+          onPageChange: handlePageChange,
+          onPageSizeChange: handlePageSizeChange,
+          sortBy: externalPaginationValues.sortBy,
+          sortDir: externalPaginationValues.sortDir,
+          onSortChange: handleSortChange
+        }}
       />
-
-      {/* Compact Backend Pagination Controls */}
-      <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
-        {/* Left: Results info and page size */}
-        <div className="flex items-center space-x-6">
-          <div className="text-sm text-gray-600">
-            <span className="font-medium text-gray-900">{pagination.total}</span> users
-            {pagination.total > 0 && (
-              <span className="ml-2">
-                (page {pagination.page} of {pagination.totalPages})
-              </span>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">Show:</label>
-            <select
-              value={pagination.pageSize}
-              onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
-              className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Center: Sorting controls */}
-        <div className="flex items-center space-x-3">
-          <label className="text-sm text-gray-600">Sort:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => handleSortChange(e.target.value, sortDir)}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-          >
-            <option value="userCode">User Code</option>
-            <option value="username">Username</option>
-            <option value="firstName">First Name</option>
-            <option value="lastName">Last Name</option>
-            <option value="email">Email</option>
-            <option value="createdAt">Created Date</option>
-            <option value="lastLoginAt">Last Login</option>
-          </select>
-          
-          <button
-            onClick={() => handleSortChange(sortBy, sortDir === 'asc' ? 'desc' : 'asc')}
-            className="px-3 py-1 text-sm bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-purple-700"
-          >
-            {sortDir === 'asc' ? '↑' : '↓'}
-          </button>
-        </div>
-        
-        {/* Right: Navigation controls */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => handlePageChange(1)}
-              disabled={pagination.page <= 1 || loading}
-              className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ««
-            </button>
-            
-            <button
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page <= 1 || loading}
-              className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ‹
-            </button>
-            
-            <span className="px-4 py-1 text-sm font-medium text-white bg-purple-600 border-t border-b border-purple-600">
-              {pagination.page}
-            </span>
-            
-            <button
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages || loading}
-              className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ›
-            </button>
-            
-            <button
-              onClick={() => handlePageChange(pagination.totalPages)}
-              disabled={pagination.page >= pagination.totalPages || loading}
-              className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              »»
-            </button>
-          </div>
-        )}
-      </div>
 
       {/* Alert Modal */}
       <Alert

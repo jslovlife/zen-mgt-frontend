@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Use typeof window check to avoid process access in browser
   BASE_URL: (typeof window === 'undefined' 
     ? process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:8080'
-    : window.ENV?.API_URL || 'http://localhost:8080'
+    : '' // Force empty BASE_URL in browser to use proxy
   ),
   TIMEOUT: 30000,
   
@@ -34,8 +34,13 @@ export const API_CONFIG = {
       DELETE: '/users',                 // DELETE /{encryptedUserId}
       CHECK_USERNAME: '/users/check-username',  // GET /{username}
       CHECK_EMAIL: '/users/check-email',        // GET /{email}
-      TOGGLE_STATUS: '/users',          // PUT /{encryptedUserId}/toggle-status
-      STATUS_STATS: '/users/status-stats'       // GET
+      TOGGLE_STATUS: '/users',          // PATCH /{encryptedUserId}/toggle-status
+      STATUS_STATS: '/users/status-stats',      // GET
+      // Security Management endpoints - from USER_SECURITY_MANAGEMENT_GUIDE.md
+      RESET_PASSWORD: '/users',         // PATCH /{encryptedUserId}/reset-password
+      RESET_MFA: '/users',              // PATCH /{encryptedUserId}/reset-mfa
+      TOGGLE_MFA: '/users',             // PATCH /{encryptedUserId}/toggle-mfa?enabled={boolean}
+      SECURITY_STATUS: '/users'         // GET /{encryptedUserId}/security-status
     },
     
     // System endpoints
@@ -53,6 +58,12 @@ if (typeof window === 'undefined') {
   console.log("Final BASE_URL:", API_CONFIG.BASE_URL);
   console.log("Login endpoint:", API_CONFIG.ENDPOINTS.AUTH.LOGIN);
   console.log("Full login URL:", `${API_CONFIG.BASE_URL}${API_CONFIG.API_PREFIX}${API_CONFIG.ENDPOINTS.AUTH.LOGIN}`);
+} else {
+  // Browser-side debugging
+  console.log("=== API CONFIG DEBUG (BROWSER) ===");
+  console.log("Final BASE_URL:", API_CONFIG.BASE_URL);
+  console.log("window.ENV?.API_URL:", window.ENV?.API_URL);
+  console.log("Should be empty for proxy to work");
 }
 
 // Helper function to build full API URLs

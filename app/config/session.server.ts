@@ -1,11 +1,20 @@
 import { redirect } from "@remix-run/node";
+import { createCookieSessionStorage } from "@remix-run/node";
+import { checkEnvironment } from "~/env-check";
+import { randomUUID } from "crypto";
 
 /**
  * Session and Authentication Utilities
  * 
  * This module provides reusable authentication functions for server-side route protection.
  * All protected routes should use these utilities to maintain consistent authentication behavior.
+ * 
+ * SECURITY ENHANCEMENT: Uses session-based authentication where only session IDs are sent to browser,
+ * keeping JWT tokens completely server-side and invisible to Network inspection.
  */
+
+// Run environment check
+checkEnvironment();
 
 // Configuration for token validity
 export const SESSION_CONFIG = {
@@ -22,25 +31,214 @@ export const SESSION_CONFIG = {
   SAME_SITE: "Strict" as const,
 } as const;
 
-export interface AuthSessionData {
-  isAuthenticated: boolean;
-  authToken: string | null;
-  tokenExpiration?: Date | null;
-  user?: {
-    username?: string;
-    id?: number;
-    userGroupId?: number;
-    hashedUserId?: string;  // NEW: Hashed User ID from JWT
-    hashedUserGroupId?: string;  // NEW: Hashed User Group ID from JWT
-    hasEnhancedSecurity?: boolean;  // NEW: Whether token has enhanced security features
-    // Add more user fields as needed
-  };
+// SECURITY: Secure session storage - only session IDs in cookies, tokens stored server-side
+const sessionSecret = process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production";
+
+console.log("🔐 Session configuration:");
+console.log("- Session secret exists:", !!process.env.SESSION_SECRET);
+console.log("- Session secret length:", sessionSecret.length);
+console.log("- Environment:", process.env.NODE_ENV);
+
+export const sessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: "__zen_session", // Changed from authToken to session ID
+    httpOnly: true, // SECURITY: Prevent JavaScript access
+    path: "/",
+    sameSite: "strict",
+    secrets: [sessionSecret],
+    secure: process.env.NODE_ENV === "production",
+    maxAge: SESSION_CONFIG.DEFAULT_MAX_AGE,
+  },
+});
+
+console.log("🍪 Session storage configured with cookie name: __zen_session");
+
+// SECURITY: Server-side token storage (in production, use Redis/Database)
+const serverSideTokenStore = new Map<string, {
+  token: string;
+  userId: string;
+  createdAt: number;
+  expiresAt: number;
+  csrfToken: string;  // NEW: CSRF protection
+}>();
+
+// Cleanup expired sessions every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, sessionData] of serverSideTokenStore.entries()) {
+    if (sessionData.expiresAt < now) {
+      serverSideTokenStore.delete(sessionId);
+      console.log(`🗑️ Cleaned up expired session: ${sessionId}`);
+    }
+  }
+}, 60 * 60 * 1000); // 1 hour
+
+// CSRF token generation
+export function generateCSRFToken(): string {
+  return randomUUID() + '-' + Date.now().toString(36);
+}
+
+// CSRF token validation
+export function validateCSRFToken(request: Request, sessionId: string): boolean {
+  const submittedToken = request.headers.get('X-CSRF-Token') || 
+                        new URL(request.url).searchParams.get('_csrf');
+  
+  if (!submittedToken) {
+    console.log("❌ No CSRF token provided");
+    return false;
+  }
+  
+  const sessionData = serverSideTokenStore.get(sessionId);
+  if (!sessionData) {
+    console.log("❌ Session not found for CSRF validation");
+    return false;
+  }
+  
+  const isValid = sessionData.csrfToken === submittedToken;
+  console.log(isValid ? "✅ CSRF token valid" : "❌ CSRF token invalid");
+  return isValid;
+}
+
+// Get CSRF token for a session
+export function getCSRFToken(sessionId: string): string | null {
+  const sessionData = serverSideTokenStore.get(sessionId);
+  return sessionData?.csrfToken || null;
 }
 
 /**
- * Extract authentication token from cookie header
- * @param cookieHeader - The Cookie header string from the request
- * @returns The authentication token or null if not found
+ * Create a secure session with JWT token stored server-side
+ */
+export async function createSecureSession(token: string, request: Request): Promise<Response> {
+  console.log("🔒 createSecureSession called");
+  console.log("Token preview:", token.substring(0, 50) + "...");
+  
+  try {
+    const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+    
+    // Generate unique session ID and CSRF token
+    const sessionId = randomUUID();
+    const csrfToken = generateCSRFToken();
+    console.log("🆔 Generated session ID:", sessionId);
+    console.log("🛡️ Generated CSRF token:", csrfToken.substring(0, 20) + "...");
+    
+    // Extract user info from token for logging/debugging
+    const payload = decodeJWTPayload(token);
+    const userId = payload?.sub || 'unknown';
+    console.log("👤 User from token:", userId);
+    
+    // Store token server-side with CSRF protection
+    const expiresAt = Date.now() + (SESSION_CONFIG.DEFAULT_MAX_AGE * 1000);
+    serverSideTokenStore.set(sessionId, {
+      token,
+      userId,
+      createdAt: Date.now(),
+      expiresAt,
+      csrfToken  // NEW: Store CSRF token
+    });
+    
+    console.log("💾 Stored token server-side for session:", sessionId);
+    console.log("📊 Server store size:", serverSideTokenStore.size);
+    
+    // Store only session ID in browser cookie (CSRF token sent separately)
+    session.set("sessionId", sessionId);
+    session.set("userId", userId);
+    
+    console.log("🍪 Setting session data in cookie");
+    
+    const cookieHeader = await sessionStorage.commitSession(session);
+    console.log("✅ Session cookie created:", cookieHeader.substring(0, 100) + "...");
+    
+    console.log(`🔒 Created secure session with CSRF protection: ${sessionId} for user: ${userId}`);
+    
+    return new Response(null, {
+      headers: {
+        "Set-Cookie": cookieHeader,
+        "X-CSRF-Token": csrfToken,  // NEW: Send CSRF token in header
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error creating secure session:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get JWT token from secure session (server-side only)
+ */
+export async function getSecureAuthToken(request: Request): Promise<string | null> {
+  console.log("🔍 getSecureAuthToken called");
+  
+  try {
+    const cookieHeader = request.headers.get("Cookie");
+    console.log("🍪 Cookie header:", cookieHeader?.substring(0, 100) + "...");
+    
+    const session = await sessionStorage.getSession(cookieHeader);
+    const sessionId = session.get("sessionId");
+    
+    console.log("🆔 Session ID from cookie:", sessionId);
+    
+    if (!sessionId) {
+      console.log("🔍 No session ID found in cookie");
+      return null;
+    }
+    
+    const sessionData = serverSideTokenStore.get(sessionId);
+    if (!sessionData) {
+      console.log(`⚠️ Session ${sessionId} not found in server store`);
+      console.log("📊 Available sessions:", Array.from(serverSideTokenStore.keys()));
+      return null;
+    }
+    
+    // Check if session is expired
+    if (sessionData.expiresAt < Date.now()) {
+      console.log(`⏰ Session ${sessionId} expired, cleaning up`);
+      serverSideTokenStore.delete(sessionId);
+      return null;
+    }
+    
+    console.log(`✅ Retrieved token for session: ${sessionId}, user: ${sessionData.userId}`);
+    console.log("🔑 Token preview:", sessionData.token.substring(0, 50) + "...");
+    return sessionData.token;
+  } catch (error) {
+    console.error("❌ Error retrieving secure auth token:", error);
+    return null;
+  }
+}
+
+/**
+ * Clear secure session
+ */
+export async function clearSecureSession(request: Request): Promise<Response> {
+  console.log("🗑️ clearSecureSession called");
+  
+  try {
+    const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+    const sessionId = session.get("sessionId");
+    
+    if (sessionId) {
+      serverSideTokenStore.delete(sessionId);
+      console.log(`🗑️ Cleared secure session: ${sessionId}`);
+      console.log("📊 Remaining sessions:", serverSideTokenStore.size);
+    } else {
+      console.log("ℹ️ No session ID to clear");
+    }
+    
+    const cookieHeader = await sessionStorage.destroySession(session);
+    console.log("🍪 Destroyed session cookie");
+    
+    return new Response(null, {
+      headers: {
+        "Set-Cookie": cookieHeader,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error clearing secure session:", error);
+    throw error;
+  }
+}
+
+/**
+ * LEGACY SUPPORT: Extract authentication token from cookie header (being phased out)
  */
 export function extractAuthToken(cookieHeader: string | null): string | null {
   if (!cookieHeader) {
@@ -67,14 +265,41 @@ export function decodeJWTPayload(token: string): any | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) {
+      console.error("Invalid JWT format - expected 3 parts, got:", parts.length);
       return null;
     }
     
     const payload = parts[1];
-    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
-    return JSON.parse(decoded);
+    
+    // Properly decode base64url
+    let base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    
+    // Decode base64
+    let decoded: string;
+    if (typeof window !== 'undefined') {
+      // Browser environment
+      decoded = atob(base64);
+    } else {
+      // Node.js environment
+      decoded = Buffer.from(base64, 'base64').toString('utf-8');
+    }
+    
+    const parsed = JSON.parse(decoded);
+    console.log("✅ JWT decoded successfully:", {
+      sub: parsed.sub,
+      exp: parsed.exp ? new Date(parsed.exp * 1000).toISOString() : 'none',
+      iat: parsed.iat ? new Date(parsed.iat * 1000).toISOString() : 'none'
+    });
+    
+    return parsed;
   } catch (error) {
-    console.error("Error decoding JWT:", error);
+    console.error("❌ Error decoding JWT:", error);
+    console.error("Token preview:", token?.substring(0, 50) + "...");
     return null;
   }
 }
@@ -87,11 +312,21 @@ export function decodeJWTPayload(token: string): any | null {
 export function isTokenExpired(token: string): boolean {
   const payload = decodeJWTPayload(token);
   if (!payload || !payload.exp) {
+    console.log("⚠️ Token invalid or no expiration found - treating as expired");
     return true; // Consider invalid tokens as expired
   }
   
   const expirationTime = payload.exp * 1000; // Convert to milliseconds
-  return Date.now() >= expirationTime;
+  const now = Date.now();
+  const isExpired = now >= expirationTime;
+  
+  console.log("🕐 Token expiration check:", {
+    now: new Date(now).toISOString(),
+    expires: new Date(expirationTime).toISOString(),
+    isExpired
+  });
+  
+  return isExpired;
 }
 
 /**
@@ -125,48 +360,77 @@ export function calculateCookieMaxAge(token: string): number {
   return Math.max(0, Math.min(timeUntilExpiration, SESSION_CONFIG.DEFAULT_MAX_AGE));
 }
 
+export interface AuthSessionData {
+  isAuthenticated: boolean;
+  authToken: string | null;
+  tokenExpiration?: Date | null;
+  user?: {
+    username?: string;
+    id?: number;
+    userGroupId?: number;
+    hashedUserId?: string;  // NEW: Hashed User ID from JWT
+    hashedUserGroupId?: string;  // NEW: Hashed User Group ID from JWT
+    hasEnhancedSecurity?: boolean;  // NEW: Whether token has enhanced security features
+    // Add more user fields as needed
+  };
+}
+
 /**
- * Get authentication session data from request
- * @param request - The Remix request object
- * @returns Session data containing authentication status and token
+ * SECURE: Get authentication session data using new session system
  */
-export function getAuthSession(request: Request): AuthSessionData {
+export async function getAuthSession(request: Request): Promise<AuthSessionData> {
+  console.log("🔍 getAuthSession called");
+  
+  // Try new secure session system first
+  const secureToken = await getSecureAuthToken(request);
+  
+  if (secureToken) {
+    console.log("🔒 Found secure token, validating...");
+    const isExpired = isTokenExpired(secureToken);
+    const tokenExpiration = getTokenExpiration(secureToken);
+    const payload = decodeJWTPayload(secureToken);
+    
+    const user = payload ? { 
+      username: payload.sub,
+      id: payload.userId || payload.id,
+      hashedUserId: payload.huid,
+      hashedUserGroupId: payload.hgid,
+      hasEnhancedSecurity: !!(payload.huid && payload.hgid)
+    } : undefined;
+    
+    console.log("🔒 Using secure session authentication");
+    
+    return {
+      isAuthenticated: !isExpired,
+      authToken: isExpired ? null : secureToken,
+      tokenExpiration,
+      user: isExpired ? undefined : user,
+    };
+  }
+  
+  // LEGACY: Fallback to cookie-based authentication (will be phased out)
+  console.log("⚠️ Falling back to legacy cookie authentication");
   const cookieHeader = request.headers.get("Cookie");
   const authToken = extractAuthToken(cookieHeader);
   
   if (!authToken) {
+    console.log("❌ No authentication found anywhere");
     return {
       isAuthenticated: false,
       authToken: null,
     };
   }
   
-  // Check if token is expired
   const isExpired = isTokenExpired(authToken);
   const tokenExpiration = getTokenExpiration(authToken);
-  
-  // Get user info from token
   const payload = decodeJWTPayload(authToken);
-  
-  // Debug JWT token contents in development
-  if (process.env.NODE_ENV === 'development' && payload) {
-    console.log("=== JWT TOKEN DEBUG ===");
-    console.log("Available claims:", Object.keys(payload));
-    console.log("Username (sub):", payload.sub);
-    console.log("User ID (id/userId):", payload.id || payload.userId);
-    console.log("Hashed User ID (huid):", payload.huid || "NOT PRESENT");
-    console.log("Hashed User Group ID (hgid):", payload.hgid || "NOT PRESENT");
-    console.log("Enhanced Security Available:", !!(payload.huid && payload.hgid));
-    console.log("Token Expiry:", payload.exp ? new Date(payload.exp * 1000).toISOString() : "Unknown");
-    console.log("========================");
-  }
   
   const user = payload ? { 
     username: payload.sub,
-    id: payload.userId || payload.id, // Support both 'userId' and 'id' field names (legacy)
-    hashedUserId: payload.huid,  // NEW: Hashed User ID
-    hashedUserGroupId: payload.hgid,  // NEW: Hashed User Group ID
-    hasEnhancedSecurity: !!(payload.huid && payload.hgid)  // NEW: Enhanced security detection
+    id: payload.userId || payload.id,
+    hashedUserId: payload.huid,
+    hashedUserGroupId: payload.hgid,
+    hasEnhancedSecurity: !!(payload.huid && payload.hgid)
   } : undefined;
   
   return {
@@ -178,20 +442,36 @@ export function getAuthSession(request: Request): AuthSessionData {
 }
 
 /**
- * Require authentication for a route loader
- * If not authenticated, automatically redirects to login page
- * @param request - The Remix request object
- * @param redirectTo - Optional custom redirect path (defaults to "/login")
- * @returns Session data if authenticated, throws redirect if not
+ * SECURE: Require authentication using new session system
  */
-export function requireAuth(request: Request, redirectTo: string = "/login"): AuthSessionData {
-  const session = getAuthSession(request);
+export function requireAuth(request: Request): AuthSessionData {
+  console.log("⚠️ WARNING: requireAuth (legacy) still being used - should use getSecureAuthToken");
   
-  if (!session.isAuthenticated) {
-    throw redirect(redirectTo);
+  // This will be updated to use async getAuthSession in the next phase
+  // For now, maintaining compatibility
+  const cookieHeader = request.headers.get("Cookie");
+  const authToken = extractAuthToken(cookieHeader);
+  
+  if (!authToken || isTokenExpired(authToken)) {
+    console.log("❌ Legacy auth failed, redirecting to login");
+    throw redirect("/login");
   }
   
-  return session;
+  const payload = decodeJWTPayload(authToken);
+  const user = payload ? { 
+    username: payload.sub,
+    id: payload.userId || payload.id,
+    hashedUserId: payload.huid,
+    hashedUserGroupId: payload.hgid,
+    hasEnhancedSecurity: !!(payload.huid && payload.hgid)
+  } : undefined;
+  
+  return {
+    isAuthenticated: true,
+    authToken,
+    tokenExpiration: getTokenExpiration(authToken),
+    user,
+  };
 }
 
 /**
@@ -245,8 +525,8 @@ export function createClearAuthCookie(): string {
  * @param request - The Remix request object
  * @returns boolean indicating authentication status
  */
-export function isAuthenticated(request: Request): boolean {
-  const session = getAuthSession(request);
+export async function isAuthenticated(request: Request): Promise<boolean> {
+  const session = await getAuthSession(request);
   return session.isAuthenticated;
 }
 
@@ -255,8 +535,8 @@ export function isAuthenticated(request: Request): boolean {
  * @param request - The Remix request object
  * @returns User information from JWT or null if not authenticated
  */
-export function getUserFromSession(request: Request): any | null {
-  const session = getAuthSession(request);
+export async function getUserFromSession(request: Request): Promise<any | null> {
+  const session = await getAuthSession(request);
   
   if (!session.authToken) {
     return null;

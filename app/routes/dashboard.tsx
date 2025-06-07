@@ -6,10 +6,12 @@ import type { BreadcrumbItem } from "~/components";
 import { getNavigationConfig, getBreadcrumbConfig } from "~/config/routes";
 import { AuthService } from "~/services/auth.service";
 import { APIUtil } from "~/utils/api.util";
-import { requireAuth } from "~/config/session.server";
 import { EnumService } from "~/services/enum.service";
 import type { EnumCollections } from "~/types/enum.type";
 import { EnumCacheUtil } from "~/utils/enum-cache.util";
+import { getSecureAuthToken } from "~/config/session.server";
+import { UserService } from "~/services";
+import { authMigration } from "~/utils/auth-migration.util";
 
 interface DashboardLoaderData {
   success: boolean;
@@ -25,111 +27,61 @@ const EnumContext = createContext<EnumCollections | null>(null);
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== DASHBOARD LOADER START ===");
   
+  // SECURITY: Use secure session authentication - no tokens in cookies!
+  const authToken = await getSecureAuthToken(request);
+  
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  console.log("✅ Secure session authenticated for dashboard");
+
   try {
-    // Use the centralized authentication utility
-    const session = requireAuth(request);
-    
-    console.log("Auth token found in cookies:", session.authToken?.substring(0, 20) + "...");
-    console.log("Authentication passed, checking for cached enums...");
-    
-    if (!session.authToken) {
-      throw new Error("No authentication token available");
-    }
-
-    // Check for cached enums from login redirect
-    const url = new URL(request.url);
-    const enumCacheParam = url.searchParams.get('enumCache');
-    
-    if (enumCacheParam) {
-      try {
-        console.log("=== USING CACHED ENUMS FROM LOGIN ===");
-        const enumData = JSON.parse(decodeURIComponent(enumCacheParam));
-        console.log("Cached enum data timestamp:", new Date(enumData.timestamp).toISOString());
-        console.log("Cached enums loaded:", {
-          recordStatuses: enumData.data.recordStatuses?.length || 0,
-          approvalRequestTypes: enumData.data.approvalRequestTypes?.length || 0,
-          approvalStatuses: enumData.data.approvalStatuses?.length || 0,
-          sysApprovalRequestStatuses: enumData.data.sysApprovalRequestStatuses?.length || 0,
-          referenceTypes: enumData.data.referenceTypes?.length || 0,
-        });
-        
-        // Clean URL by redirecting without the cache parameter
-        if (url.search.includes('enumCache')) {
-          url.searchParams.delete('enumCache');
-          // Don't redirect on first load, just use the data
-          console.log("Using cached enums, will clean URL on next navigation");
-        }
-        
-        return json({ 
-          success: true, 
-          enums: enumData.data,
-          error: null,
-          cached: true
-        } as DashboardLoaderData);
-      } catch (parseError) {
-        console.error("Failed to parse cached enum data:", parseError);
-        // Fall through to API loading
-      }
-    }
-
-    // Note: On subsequent page loads, we'll rely on client-side localStorage
-    // and only load from API if absolutely necessary
-    console.log("=== NO CACHED ENUMS - CHECKING IF API CALL IS NEEDED ===");
-    console.log("This might be a subsequent navigation - client will check localStorage first");
-
-    // Try to load from API as fallback or if no cache
-    console.log("=== LOADING ENUMS FROM API ===");
+    // Use the auth token for enum service
     const enumService = EnumService.getInstance();
-    const enums = await enumService.getAllEnums(session.authToken);
     
-    console.log("Enums loaded from API:", {
-      recordStatuses: enums.recordStatuses?.length || 0,
-      approvalRequestTypes: enums.approvalRequestTypes?.length || 0,
-      approvalStatuses: enums.approvalStatuses?.length || 0,
-      sysApprovalRequestStatuses: enums.sysApprovalRequestStatuses?.length || 0,
-      referenceTypes: enums.referenceTypes?.length || 0,
-    });
-    
-    return json({ 
-      success: true, 
+    console.log("=== FETCHING ENUMS WITH SECURE TOKEN ===");
+    const enums = await enumService.getAllEnums(authToken);
+    console.log("Enums loaded:", Object.keys(enums));
+
+    // Try to get user info (optional, for display purposes)
+    let currentUser = null;
+    try {
+      const userService = UserService.getInstance();
+      userService.setServerAuthToken(authToken);
+      // We would need the current user's ID here - for now, we'll skip this
+      userService.clearServerAuthToken();
+    } catch (userError) {
+      console.warn("Could not fetch current user info:", userError);
+    }
+
+    return json({
       enums,
-      error: null,
-      cached: false
-    } as DashboardLoaderData);
-    
+      currentUser,
+      success: true
+    });
   } catch (error) {
-    console.error("Error in dashboard loader:", error);
+    console.error("Dashboard loader error:", error);
     
-    if (error instanceof Response && error.status === 401) {
-      // Redirect to login on auth failure
-      throw new Response('Unauthorized', { 
-        status: 302,
-        headers: { Location: '/login' }
-      });
+    // If enums fail to load due to auth issues, redirect to login
+    if (error instanceof Error && (
+      error.message.includes('401') || 
+      error.message.includes('UNAUTHORIZED') ||
+      error.message.includes('unauthorized') ||
+      error.message.includes('403')
+    )) {
+      console.log("Auth error in dashboard, redirecting to login");
+      throw redirect("/login");
     }
     
-    // Provide fallback enum data instead of complete failure
-    console.log("=== PROVIDING FALLBACK ENUM DATA ===");
-    const fallbackEnums = {
-      recordStatuses: [
-        { code: 1, name: 'ACTIVE', display: 'Active', category: 'recordStatus', sortOrder: 1, isDefault: true, metadata: { color: 'green' }},
-        { code: 2, name: 'INACTIVE', display: 'Inactive', category: 'recordStatus', sortOrder: 2, isDefault: false, metadata: { color: 'red' }},
-        { code: 3, name: 'PENDING', display: 'Pending', category: 'recordStatus', sortOrder: 3, isDefault: false, metadata: { color: 'yellow' }},
-        { code: 4, name: 'SUSPENDED', display: 'Suspended', category: 'recordStatus', sortOrder: 4, isDefault: false, metadata: { color: 'orange' }},
-        { code: 5, name: 'DELETED', display: 'Deleted', category: 'recordStatus', sortOrder: 5, isDefault: false, metadata: { color: 'gray' }}
-      ],
-      approvalRequestTypes: [],
-      approvalStatuses: [],
-      sysApprovalRequestStatuses: [],
-      referenceTypes: []
-    };
-    
-    return json({ 
-      success: true,  // Mark as success so the app continues to work
-      enums: fallbackEnums,
-      error: `Using fallback enum data: ${error instanceof Error ? error.message : 'Failed to load application data'}`,
-      cached: false
-    } as DashboardLoaderData);
+    // Return error state for non-auth issues but don't crash
+    return json({
+      enums: null,
+      currentUser: null,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
 
@@ -139,6 +91,30 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { success, enums, error, cached } = useLoaderData<DashboardLoaderData>();
   const revalidator = useRevalidator();
+
+  // SECURITY: Clean up legacy client-side auth on dashboard load
+  useEffect(() => {
+    console.log("🔒 DASHBOARD: Cleaning up legacy client-side authentication");
+    
+    // Clean up any legacy auth data but don't redirect - server-side auth is handling protection
+    const authStatus = authMigration.getAuthStatus();
+    console.log("📊 Auth Status:", authStatus);
+    
+    if (authStatus.hasLegacyAuth) {
+      console.log("⚠️ LEGACY AUTH DETECTED - CLEANING UP");
+      authMigration.forceCompleteMigration();
+    }
+    
+    // Note: No client-side redirects - server-side loader handles all authentication
+    console.log("✅ Server-side authentication is protecting this route");
+  }, []);
+
+  // Debug auth state in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      authMigration.debugAuthState();
+    }
+  }, []);
 
   useEffect(() => {
     console.log("=== DASHBOARD COMPONENT MOUNTED ===");
@@ -430,16 +406,7 @@ export default function DashboardLayout() {
 export function useEnums(): EnumCollections {
   const enums = useContext(EnumContext);
   
-  console.log("=== useEnums CALLED ===");
-  console.log("Context value:", enums);
-  console.log("Context exists:", !!enums);
-  console.log("Component location:", typeof window !== 'undefined' ? window.location.pathname : 'server-side');
-  
   if (!enums) {
-    console.error("=== useEnums ERROR ===");
-    console.error("EnumContext is null or undefined");
-    console.error("Current location:", typeof window !== 'undefined' ? window.location.pathname : 'server-side');
-    console.error("Trying localStorage fallback...");
     
     // Try localStorage fallback before throwing error
     if (typeof window !== 'undefined') {
@@ -447,7 +414,6 @@ export function useEnums(): EnumCollections {
         const cached = localStorage.getItem('zen_mgt_enums');
         if (cached) {
           const cacheData = JSON.parse(cached);
-          console.log("=== USING LOCALSTORAGE FALLBACK ===");
           console.log("Found cached enum data:", cacheData);
           return cacheData.data;
         }

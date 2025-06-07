@@ -2,23 +2,29 @@ import React, { useState } from 'react';
 import { UserPlus, Save } from 'lucide-react';
 import { useNavigate, Form as RemixForm } from '@remix-run/react';
 import { PageLayout } from '~/components/layout/PageLayout';
-import { FormField, ButtonGroup } from '~/components';
+import { FormField, ButtonGroup, Alert } from '~/components';
 import type { ButtonConfig } from '~/components';
 import { CreateUserRequest } from '~/types/user.type';
 import { type LoaderFunctionArgs, type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useActionData, useNavigation } from "@remix-run/react";
 import { UserService } from "~/services";
-import { requireAuth } from "~/config/session.server";
+import { getSecureAuthToken } from "~/config/session.server";
 import { JWTUtil } from "~/config/session.server";
+import { APIUtil } from "~/utils/api.util";
 
 // Loader function to protect the route
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== USER INSERT LOADER START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
+  // Use secure session authentication
+  const authToken = await getSecureAuthToken(request);
   
-  console.log("User insert auth token found:", session.authToken?.substring(0, 20) + "...");
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  console.log("User insert auth token found:", authToken.substring(0, 20) + "...");
   console.log("User insert authentication passed, allowing access");
   
   return null;
@@ -28,41 +34,50 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   console.log("=== USER INSERT ACTION START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
+  // Use secure session authentication
+  const authToken = await getSecureAuthToken(request);
   
-  console.log("User insert action auth token found:", session.authToken?.substring(0, 20) + "...");
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  console.log("User insert action auth token found:", authToken.substring(0, 20) + "...");
   console.log("Session data:", {
-    isAuthenticated: session.isAuthenticated,
-    hasToken: !!session.authToken,
-    tokenLength: session.authToken?.length,
-    user: session.user
+    isAuthenticated: true,
+    hasToken: !!authToken,
+    tokenLength: authToken?.length,
+    user: {
+      // Placeholder for user information
+    }
   });
   
   try {
     const formData = await request.formData();
     
-    console.log("Session user:", session.user);
+    console.log("Session user:", {
+      // Placeholder for user information
+    });
 
     // Enhanced JWT Token Debugging
-    if (session.authToken) {
-      JWTUtil.logTokenInfo(session.authToken);
+    if (authToken) {
+      JWTUtil.logTokenInfo(authToken);
     }
 
     // Use hashed user ID directly from enhanced JWT (backend handles all hashing)
     let hashedCreatedByValue: string = "";
     
-    if (session.user?.hasEnhancedSecurity && session.user?.hashedUserId) {
+    if (authToken) {
       // Use hashed user ID from enhanced JWT token as-is
-      hashedCreatedByValue = session.user.hashedUserId;
+      hashedCreatedByValue = authToken;
       console.log("Using enhanced JWT hashed user ID for hashedCreatedBy:", hashedCreatedByValue.substring(0, 20) + "...");
     } else {
       // Fallback for standard JWT tokens - use username or numeric ID
-      if (session.user?.username) {
-        hashedCreatedByValue = session.user.username;
+      if (authToken) {
+        hashedCreatedByValue = authToken;
         console.log("Using username for hashedCreatedBy (fallback):", hashedCreatedByValue);
-      } else if (session.user?.id) {
-        hashedCreatedByValue = session.user.id.toString();
+      } else if (authToken) {
+        hashedCreatedByValue = authToken;
         console.log("Using numeric user ID for hashedCreatedBy (fallback):", hashedCreatedByValue);
       } else {
         console.warn("No user identifier available for hashedCreatedBy");
@@ -106,9 +121,9 @@ export async function action({ request }: ActionFunctionArgs) {
     console.log("About to inject auth token into UserService");
     
     // Inject the server-side auth token
-    if (session.authToken) {
-      console.log("Injecting token:", session.authToken.substring(0, 20) + "...");
-      userService.setServerAuthToken(session.authToken);
+    if (authToken) {
+      console.log("Injecting token:", authToken.substring(0, 20) + "...");
+      userService.setServerAuthToken(authToken);
     } else {
       console.error("No auth token available to inject!");
       return json({ 

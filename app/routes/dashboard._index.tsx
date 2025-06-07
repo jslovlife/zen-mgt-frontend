@@ -3,16 +3,22 @@ import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Building2, CreditCard, Users, Settings, TrendingUp, Activity } from 'lucide-react';
 import { PageLayout } from '~/components/layout/PageLayout';
 import { APIUtil } from "~/utils/api.util";
-import { requireAuth } from "~/config/session.server";
+import { getSecureAuthToken } from "~/config/session.server";
 
 // Loader function to protect dashboard index route
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("=== DASHBOARD INDEX LOADER START ===");
   
-  // Use the centralized authentication utility
-  const session = requireAuth(request);
+  // Use the new secure session system
+  const authToken = await getSecureAuthToken(request);
   
-  console.log("Dashboard index auth token found:", session.authToken?.substring(0, 20) + "...");
+  if (!authToken) {
+    console.log("❌ No secure session found, redirecting to login");
+    throw redirect("/login");
+  }
+  
+  console.log("✅ Dashboard index secure session authenticated");
+  console.log("Dashboard index auth token found:", authToken.substring(0, 20) + "...");
   console.log("Dashboard index authentication passed, allowing access");
   
   return null;

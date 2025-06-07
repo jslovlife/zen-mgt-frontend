@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Filter } from 'lucide-react';
 
 interface DropdownOption {
@@ -24,14 +25,41 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
   style
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below');
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Debug incoming props
+  console.log('🔧 CustomDropdown render with props:', {
+    value,
+    placeholder,
+    optionsCount: options.length,
+    options: options.map(opt => `${opt.label}:${opt.value}`),
+    selectedOption: options.find(opt => opt.value === value)
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+      const target = event.target as Node;
+      console.log('🔧 CustomDropdown click outside check:', {
+        isOpen,
+        hasButtonRef: !!buttonRef.current,
+        hasDropdownRef: !!dropdownRef.current,
+        buttonContainsTarget: buttonRef.current?.contains(target),
+        dropdownContainsTarget: dropdownRef.current?.contains(target),
+        targetTagName: (target as Element)?.tagName,
+        targetTextContent: (target as Element)?.textContent?.trim()
+      });
+      
+      // Don't close if clicking on button or dropdown content
+      if (buttonRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
+        console.log('🔧 CustomDropdown NOT closing - click is on button or dropdown content');
+        return;
       }
+      
+      console.log('🔧 CustomDropdown closing due to click outside');
+      setIsOpen(false);
     };
 
     if (isOpen) {
@@ -43,34 +71,143 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
   }, [isOpen]);
 
+  // Calculate optimal dropdown position when opened
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const dropdownHeight = Math.min(options.length * 44 + 40, 280); // Estimate dropdown height
+      
+      // Show above if not enough space below
+      const shouldShowAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+      setDropdownPosition(shouldShowAbove ? 'above' : 'below');
+    }
+  }, [isOpen, options.length]);
+
   const handleSelect = (optionValue: string) => {
+    console.log('🔧 CustomDropdown handleSelect called:', { 
+      optionValue, 
+      currentValue: value,
+      willTriggerOnChange: true 
+    });
     onChange(optionValue);
     setIsOpen(false);
   };
 
   const handleButtonClick = () => {
+    console.log('🔧 CustomDropdown button clicked, isOpen will be:', !isOpen);
     setIsOpen(!isOpen);
   };
 
   const selectedOption = options.find(opt => opt.value === value);
   const displayValue = selectedOption ? selectedOption.label : placeholder;
 
+  console.log('🔧 CustomDropdown computed values:', {
+    selectedOption: selectedOption ? `${selectedOption.label}:${selectedOption.value}` : 'null',
+    displayValue,
+    isOpen
+  });
+
+  // Get button position for portal
+  const getDropdownStyle = (): React.CSSProperties => {
+    if (!buttonRef.current) return {};
+    
+    const rect = buttonRef.current.getBoundingClientRect();
+    
+    return {
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      zIndex: 999999,
+      maxHeight: '280px',
+      backgroundColor: 'white',
+      border: '1px solid #d1d5db',
+      borderRadius: '8px',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      overflowY: 'auto',
+      ...(dropdownPosition === 'above' ? {
+        bottom: window.innerHeight - rect.top + 4,
+      } : {
+        top: rect.bottom + 4,
+      }),
+    };
+  };
+
+  // Portal dropdown content
+  const dropdownContent = isOpen ? (
+    <div ref={dropdownRef} style={getDropdownStyle()}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => {
+            console.log('🔧 CustomDropdown OPTION CLICKED:', {
+              optionLabel: option.label,
+              optionValue: option.value,
+              currentValue: value,
+              willCallHandleSelect: true
+            });
+            handleSelect(option.value);
+          }}
+          onMouseDown={(e) => {
+            console.log('🔧 CustomDropdown OPTION MOUSE DOWN:', {
+              optionLabel: option.label,
+              optionValue: option.value
+            });
+          }}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            textAlign: 'left',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            height: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: options.indexOf(option) < options.length - 1 ? '1px solid #e5e7eb' : 'none',
+            backgroundColor: value === option.value ? '#ede9fe' : 'white',
+            color: value === option.value ? '#7c3aed' : '#111827',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (value !== option.value) {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (value !== option.value) {
+              e.currentTarget.style.backgroundColor = 'white';
+            }
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   return (
-    <div ref={dropdownRef} className={`relative ${className}`} style={{ ...style, position: 'relative', zIndex: 1 }}>
+    <div className={`relative ${className}`} style={style}>
       {/* Filter Icon */}
-      <Filter className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+      <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
       
       {/* Dropdown Button */}
       <button
+        ref={buttonRef}
         type="button"
         onClick={handleButtonClick}
-        className="search-input w-full pl-20 pr-12 py-2 text-left rounded-lg cursor-pointer transition-all flex items-center"
+        className="w-full pl-8 pr-10 py-2 text-left rounded-lg cursor-pointer transition-all flex items-center border border-gray-300 bg-white hover:border-purple-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
         style={{
-          borderColor: isOpen ? 'var(--color-primary-600)' : undefined,
-          boxShadow: isOpen ? '0 0 0 2px rgba(147, 51, 234, 0.2)' : undefined
+          height: '42px',
+          fontSize: '14px',
+          color: selectedOption ? '#1f2937' : '#6b7280',
+          borderColor: isOpen ? '#9333ea' : '#d1d5db',
+          boxShadow: isOpen ? '0 0 0 2px rgba(147, 51, 234, 0.2)' : 'none'
         }}
       >
-        <span className={`flex-1 ${value ? 'text-gray-900' : 'text-gray-500'}`}>
+        <span className="flex-1 truncate">
           {displayValue}
         </span>
         <ChevronDown 
@@ -80,60 +217,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         />
       </button>
 
-      {/* Dropdown Menu - Proper styling with theme colors */}
-      {isOpen && (
-        <div 
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: '0',
-            right: '0',
-            marginTop: '4px',
-            backgroundColor: 'white',
-            border: '1px solid var(--color-border-primary)',
-            borderRadius: '8px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            zIndex: 99999,
-            maxHeight: '240px',
-            overflowY: 'auto',
-            minWidth: '100%'
-          }}
-        >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleSelect(option.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                textAlign: 'left',
-                backgroundColor: value === option.value ? 'var(--color-primary-100)' : 'white',
-                color: value === option.value ? 'var(--color-primary-800)' : 'var(--color-text-primary)',
-                border: 'none',
-                borderBottom: '1px solid var(--color-border-primary)',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: value === option.value ? '500' : '400',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (value !== option.value) {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-50)';
-                  e.currentTarget.style.color = 'var(--color-primary-700)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (value !== option.value) {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.color = 'var(--color-text-primary)';
-                }
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+      {/* Portal dropdown to document body */}
+      {typeof document !== 'undefined' && createPortal(
+        dropdownContent,
+        document.body
       )}
     </div>
   );

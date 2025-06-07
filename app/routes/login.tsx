@@ -5,7 +5,7 @@ import { z } from "zod";
 import { LoginForm } from "~/components/forms/LoginForm";
 import { APIUtil, type LoginRequest } from "~/utils/api.util";
 import { GlobalAlertMessageHandler } from "~/utils/alert.util";
-import { createAuthCookie } from "~/config/session.server";
+import { createSecureSession } from "~/config/session.server";
 import { EnumService } from "~/services/enum.service";
 
 // Validation schema
@@ -134,12 +134,12 @@ export async function action({ request }: ActionFunctionArgs) {
         // Load enums for caching
         const enumData = await loadAndCacheEnums(data.token);
         
-        console.log("=== CREATING AUTH COOKIE ===");
-        const cookieValue = createAuthCookie(data.token);
-        console.log("Cookie value:", cookieValue);
+        console.log("=== CREATING SECURE SESSION ===");
+        // SECURITY: Create secure session - token stored server-side, only session ID in cookie
+        const sessionResponse = await createSecureSession(data.token, request);
         
-        console.log("=== SETTING REDIRECT FLAG AND USING SERVER REDIRECT ===");
-        console.log("Using traditional redirect() to force navigation");
+        console.log("=== SECURE SESSION REDIRECT ===");
+        console.log("Using secure session redirect to dashboard");
         
         // Create redirect with enum caching
         const redirectUrl = enumData 
@@ -147,9 +147,7 @@ export async function action({ request }: ActionFunctionArgs) {
           : "/dashboard";
         
         return redirect(redirectUrl, {
-          headers: {
-            "Set-Cookie": cookieValue,
-          },
+          headers: sessionResponse.headers, // Secure session cookie
         });
       }
 
@@ -180,14 +178,14 @@ export async function action({ request }: ActionFunctionArgs) {
         // Load enums for caching
         const enumData = await loadAndCacheEnums(data.token);
         
-        console.log("Creating MFA redirect response with cookie");
+        console.log("Creating MFA secure session redirect");
         
-        console.log("=== CREATING MFA AUTH COOKIE ===");
-        const cookieValue = createAuthCookie(data.token);
-        console.log("Cookie value:", cookieValue);
+        console.log("=== CREATING SECURE MFA SESSION ===");
+        // SECURITY: Create secure session for MFA login
+        const sessionResponse = await createSecureSession(data.token, request);
         
-        console.log("=== MFA SERVER REDIRECT ===");
-        console.log("Using traditional redirect() for MFA success");
+        console.log("=== MFA SECURE SESSION REDIRECT ===");
+        console.log("Using secure session redirect for MFA success");
         
         // Create redirect with enum caching
         const redirectUrl = enumData 
@@ -195,9 +193,7 @@ export async function action({ request }: ActionFunctionArgs) {
           : "/dashboard";
         
         return redirect(redirectUrl, {
-          headers: {
-            "Set-Cookie": cookieValue,
-          },
+          headers: sessionResponse.headers, // Secure session cookie
         });
       }
 

@@ -23,9 +23,8 @@ export interface CreateUserRequest {
 export interface UpdateUserRequest {
   username?: string;
   email?: string;
-  recordStatus?: String;
   sessionValidity?: number;
-  // Removed hashedUpdatedBy - backend uses X-Current-User header instead
+  // Removed recordStatus and hashedUpdatedBy - recordStatus is no longer editable
 }
 
 export interface SessionValidityRequest {
