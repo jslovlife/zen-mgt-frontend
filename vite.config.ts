@@ -1,4 +1,5 @@
 import { vitePlugin as remix } from "@remix-run/dev";
+import { installGlobals } from "@remix-run/node";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
@@ -7,6 +8,8 @@ declare module "@remix-run/node" {
     v3_singleFetch: true;
   }
 }
+
+installGlobals();
 
 export default defineConfig({
   plugins: [
@@ -18,6 +21,7 @@ export default defineConfig({
         v3_singleFetch: true,
         v3_lazyRouteDiscovery: true,
       },
+      ignoredRouteFiles: ["**/*.css"],
     }),
     tsconfigPaths(),
   ],
@@ -40,5 +44,12 @@ export default defineConfig({
   server: {
     // Only allow localhost in development
     host: process.env.NODE_ENV === 'development' ? 'localhost' : false,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   }
 });

@@ -10,6 +10,7 @@ import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useEffect } from "react";
 import { ThemeManager } from "~/utils/theme.util";
+import { getAuthSession } from "~/config/session.server";
 
 import "./tailwind.css";
 import "./styles/design-tokens.css";
@@ -43,12 +44,16 @@ export const links: LinksFunction = () => [
   },
 ];
 
-// Loader to pass environment variables to the client
+// Loader to pass environment variables and auth token to the client
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Get auth session to extract token for client-side use
+  const authSession = getAuthSession(request);
+  
   return json({
     ENV: {
       API_URL: process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:8080',
     },
+    authToken: authSession.authToken, // Pass auth token to client
   });
 }
 
@@ -60,6 +65,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Pass auth token to client via meta tag for API calls */}
+        {data.authToken && <meta name="auth-token" content={data.authToken} />}
         <Meta />
         <Links />
       </head>
